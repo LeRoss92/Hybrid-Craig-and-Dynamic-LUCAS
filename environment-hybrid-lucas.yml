@@ -1,0 +1,25 @@
+name: hybrid-lucas
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - jupyter
+  - papermill
+  - jax
+  - jaxlib
+  - diffrax
+  - pandas
+  - matplotlib
+  - numpy
+  - pyreadr
+  - openpyxl
+  - earthengine-api
+  - netcdf4
+  - xarray
+  - dask
+  - rasterio
+  - scikit-learn
+  - xgboost
+  - lightgbm
+  - catboost
+  - joblib
