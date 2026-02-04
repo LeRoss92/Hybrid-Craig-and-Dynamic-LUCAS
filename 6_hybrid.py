@@ -428,9 +428,6 @@ def main():
     pred_final = batched_sim(p_pred, y0_true)
     pred_delta = pred_final - y0_true
 
-    df["final_pred_Cp"] = jax.device_get(pred_final[:, 0])
-    df["final_pred_Cb"] = jax.device_get(pred_final[:, 1])
-    df["final_pred_Cm"] = jax.device_get(pred_final[:, 2])
     abs_err = jnp.abs(pred_delta - targets)
     rmse = jnp.sqrt(jnp.mean((pred_delta - targets) ** 2, axis=0))
     mae = jnp.mean(abs_err, axis=0)
@@ -446,16 +443,22 @@ def main():
     )
     pred_delta_norm = normalize_targets(pred_delta)
     targets_norm = normalize_targets(targets)
-    df["delta_true_Cp_norm"] = jax.device_get(targets_norm[:, 0])
-    df["delta_true_Cb_norm"] = jax.device_get(targets_norm[:, 1])
-    df["delta_true_Cm_norm"] = jax.device_get(targets_norm[:, 2])
-    df["delta_pred_Cp_norm"] = jax.device_get(pred_delta_norm[:, 0])
-    df["delta_pred_Cb_norm"] = jax.device_get(pred_delta_norm[:, 1])
-    df["delta_pred_Cm_norm"] = jax.device_get(pred_delta_norm[:, 2])
     test_idx_np = jax.device_get(test_idx)
     split = np.array(["train"] * n_samples, dtype=object)
     split[test_idx_np] = "test"
-    df["split"] = split
+    new_cols = {
+        "final_pred_Cp": jax.device_get(pred_final[:, 0]),
+        "final_pred_Cb": jax.device_get(pred_final[:, 1]),
+        "final_pred_Cm": jax.device_get(pred_final[:, 2]),
+        "delta_true_Cp_norm": jax.device_get(targets_norm[:, 0]),
+        "delta_true_Cb_norm": jax.device_get(targets_norm[:, 1]),
+        "delta_true_Cm_norm": jax.device_get(targets_norm[:, 2]),
+        "delta_pred_Cp_norm": jax.device_get(pred_delta_norm[:, 0]),
+        "delta_pred_Cb_norm": jax.device_get(pred_delta_norm[:, 1]),
+        "delta_pred_Cm_norm": jax.device_get(pred_delta_norm[:, 2]),
+        "split": split,
+    }
+    df = pd.concat([df, pd.DataFrame(new_cols, index=df.index)], axis=1)
     print(df)
 
     test_df = df[df["split"] == "test"]
@@ -479,7 +482,7 @@ def main():
         ax.set_xlabel("True")
         ax.set_ylabel("Pred")
     plt.tight_layout()
-    fig.savefig("parity.png")
+    fig.savefig("figures/parity.png")
 
     test_df = test_df.copy()
     for pool in ["Cp", "Cb", "Cm"]:
