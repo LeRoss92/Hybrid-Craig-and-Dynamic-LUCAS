@@ -8,20 +8,18 @@ microbial_decompositions=('linear' 'MM' 'RMM')
 microbial_turnovers=('linear' 'density_dependent')
 saturations=('no' 'Langmuir')
 targets_combinations=('Cp,Cb,Cm' 'Cp,Cb' 'Cp,Cm' 'Cp')
-folds=(0 1) # 2 3 4 5 6 7 8 9)
-global_params_sets=('') # empty string means no global params
+folds=(0 1 2 3 4 5 6 7 8 9)
+
+mkdir -p 6_hybrid_outputs
 
 combinations=()
-
 for md in "${microbial_decompositions[@]}"; do
     for mt in "${microbial_turnovers[@]}"; do
         for sat in "${saturations[@]}"; do
             for targets in "${targets_combinations[@]}"; do
                 for fold in "${folds[@]}"; do
-                    for global_params in "${global_params_sets[@]}"; do
-                        for temp in "${temps[@]}"; do
-                            combinations+=("${temp}:${fold}:${md}:${mt}:${sat}:${targets}:${global_params}")
-                        done
+                    for temp in "${temps[@]}"; do
+                        combinations+=("${temp}:${fold}:${md}:${mt}:${sat}:${targets}")
                     done
                 done
             done
