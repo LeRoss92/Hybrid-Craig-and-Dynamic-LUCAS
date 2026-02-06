@@ -1,4 +1,6 @@
 import argparse
+import time
+import os
 import jax
 import jax.numpy as jnp
 import diffrax as dfx
@@ -8,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from hybrid_models import craig_BA_adapt, analytical_steady_state
 from hybrid_config import default_param_ranges, predictors_dynamic, predictors_2015, predictors_2018, log_cols
-from hybrid_utils import vector_field, simulate_final_state, init_mlp, mlp_forward, constrain_to_range, normalize_targets, eval_loss, init_adam, eval_r2, train_step
+from hybrid_utils import vector_field, simulate_final_state, init_mlp, build_param_matrix, normalize_targets, eval_loss, init_adam, eval_r2, train_step
 
 dt0 = 0.05 # years
 depth = 5
@@ -49,6 +51,7 @@ def log_and_stocks(df):
 
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--temp"); parser.add_argument("--fold"); parser.add_argument("--md"); parser.add_argument("--mt"); parser.add_argument("--sat"); parser.add_argument("--targets"); parser.add_argument("--global-params", default=""); args = parser.parse_args()
+    start_time = time.perf_counter()
     use_dynamic = args.temp == "2015_2018"
     target_mask = {
         "Cp,Cb,Cm": jnp.array([1.0, 1.0, 1.0]),
@@ -85,6 +88,7 @@ def main():
         & np.isfinite(helper_df[npp_col])
         & (helper_df[npp_col] > 0)
     ).to_numpy()
+    original_idx = np.where(npp_mask)[0]
     helper_df = helper_df.loc[npp_mask].reset_index(drop=True)
     split_col = helper_df["split"].astype(str).to_numpy() # use same splits as in prediction
     train_idx = np.where((split_col != "test") & (split_col != str(args.fold)))[0] # train on all folds ecxept validation fold (and also not test)
@@ -145,17 +149,31 @@ def main():
                 best_test = float(val_loss)
                 best_params = params
             print(f"step {step} loss {loss:.6f} | R2 Cp {val_r2_np[0]:.3f} Cb {val_r2_np[1]:.3f} Cm {val_r2_np[2]:.3f}")
-            
-    # # predict
-    # raw = jax.vmap(lambda x: mlp_forward(best_params, x))(x_features)
-    # p_pred = constrain_to_range(raw, param_mins, param_maxs)
-    # p_pred = p_pred.at[:, 0].set(npp_I_all)
-    # if use_dynamic:
-    #     pred_final = batched_sim(p_pred, y0_true)
-    #     pred_compare = pred_final - y0_true
-    # else:
-    #     pred_final = batched_steady(p_pred)
-    #     pred_compare = pred_final
+
+    # predict (train/eval/test) and save outputs in original scale  # section header
+    p_pred = build_param_matrix(  # predict parameters for all samples
+        best_params["net"],  # network weights
+        best_params["global"],  # global raw params (if any)
+        x_features,  # normalized features
+        npp_I_all,  # NPP forcing
+        param_mins=param_mins,  # parameter lower bounds
+        param_maxs=param_maxs,  # parameter upper bounds
+        global_mask=global_mask)  # which params are global
+    if use_dynamic:  # if dynamic mode
+        pred_final = batched_sim(p_pred, y0_true)  # simulate final state
+        pred_compare = pred_final - y0_true  # convert to delta for targets
+    else:  # if steady-state
+        pred_final = batched_steady(p_pred)  # compute steady-state
+        pred_compare = pred_final  # targets for steady-state
+    params_all, pred_final_all, pred_compare_all = map(jax.device_get, (p_pred, pred_final, pred_compare))  # move to numpy
+    out_cols = [f"target_{l}" for l in ["Cp", "Cb", "Cm"]] + [f"pred_{l}" for l in ["Cp", "Cb", "Cm"]] + [f"pred_final_{l}" for l in ["Cp", "Cb", "Cm"]] + [f"param_{n}" for n in param_names]  # output columns
+    df_out = pd.DataFrame(np.c_[jax.device_get(targets), pred_compare_all, pred_final_all, params_all], index=original_idx, columns=out_cols)
+
+    # save results
+    os.makedirs("6_hybrid_outputs", exist_ok=True)  # ensure folder exists
+    file_name = f"hybrid_temp{args.temp}_fold{args.fold}_md{args.md}_mt{args.mt}_sat{args.sat}_targets{args.targets.replace(',', '-')}_globals{'none' if not global_names else '-'.join(global_names)}.pkl"
+    df_out.to_pickle(os.path.join("6_hybrid_outputs", file_name)) # pickle
+    print(f"total_time_sec {time.perf_counter() - start_time:.0f}: {file_name}")
 
 if __name__ == "__main__":
     main()

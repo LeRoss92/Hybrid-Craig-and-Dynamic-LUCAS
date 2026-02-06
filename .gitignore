@@ -1,6 +1,7 @@
 *.pkl
 original_files/
 5_results/
-3_AlphaEarth
+3_AlphaEarth/
+6_hybrid_outputs/
 figures/
 __pycache__/
