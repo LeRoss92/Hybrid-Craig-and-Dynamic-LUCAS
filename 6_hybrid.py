@@ -19,39 +19,6 @@ lr = 2e-4
 batch_size = 1024
 n_steps = 3000 # epochs
 
-def load_sensitivities():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(base_dir, "sensitivities.csv")
-    pkl_path = os.path.join(base_dir, "sensitivities.pkl")
-    if os.path.exists(csv_path):
-        return pd.read_csv(csv_path)
-    try:
-        return pd.read_pickle(pkl_path)
-    except Exception as exc:
-        raise RuntimeError(
-            "Failed to load sensitivities. "
-            "If this is a pandas/pickle version mismatch, rerun "
-            "`sensitivity_analysis.py` to regenerate `sensitivities.csv`."
-        ) from exc
-
-def plot_parity(test_df, true_prefix, pred_prefix, title, filename):
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4), sharex=False, sharey=False)
-    for ax, label in zip(axes, ["Cp", "Cb", "Cm"]):
-        true_vals = test_df[f"{true_prefix}{label}"].to_numpy()
-        pred_vals = test_df[f"{pred_prefix}{label}"].to_numpy()
-        ax.hexbin(true_vals, pred_vals, gridsize=45, mincnt=1, cmap="viridis")
-        min_val = min(true_vals.min(), pred_vals.min())
-        max_val = max(true_vals.max(), pred_vals.max())
-        ax.plot([min_val, max_val], [min_val, max_val], "--", color="gray")
-        ss_res = np.sum((true_vals - pred_vals) ** 2)
-        ss_tot = np.sum((true_vals - np.mean(true_vals)) ** 2)
-        r2 = 1.0 - ss_res / (ss_tot + 1e-12)
-        ax.set_title(f"{label} {title} (test)\nR2={r2:.3f}")
-        ax.set_xlabel("True")
-        ax.set_ylabel("Pred")
-    plt.tight_layout()
-    fig.savefig(filename)
-
 def log_and_stocks(df):
     helper_df = df.copy()
     for col in log_cols:
@@ -75,7 +42,7 @@ def main():
         "Cp": jnp.array([1.0, 0.0, 0.0]),
     }[args.targets]
 
-    sensitivities = load_sensitivities() # load importances
+    sensitivities = pd.read_csv("sensitivities.csv") # load importances
     model_sens = sensitivities[(sensitivities["md"] == args.md) & (sensitivities["mt"] == args.mt) & (sensitivities["sat"] == args.sat) & (sensitivities["temp"] == ("dynamic" if use_dynamic else "steady"))].iloc[0] # pick for this combination
     param_sens = model_sens.drop(labels=["md", "mt", "sat", "temp"]) # pick only parameters
     nonzero_params = [name for name, val in param_sens.items() if name != "I" and val != 0.0] # create list of non 0.0 (excluding I)
