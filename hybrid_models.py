@@ -43,7 +43,9 @@ def craig_BA_adapt(
             return k_b * C_b
     elif microbial_turnover == "density_dependent":
         def mic_tur(k_b, C_b, beta_i):
-            return k_b * C_b ** beta_i
+            # Guard against non-physical negative biomass values causing NaNs for fractional beta.
+            C_b_safe = jnp.maximum(C_b, 1e-12)
+            return k_b * C_b_safe ** beta_i
 
     if carbon_use_efficiency == "constant":
         def ca_us_ef(CUE_i, Cg0b_i, C_b):
