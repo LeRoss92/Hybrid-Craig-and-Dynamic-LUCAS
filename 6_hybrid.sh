@@ -75,7 +75,7 @@ while [ $combo_index -lt $total ] || [ ${#job_ids[@]} -gt 0 ]; do
     
     printf "\rRunning: %d | Pending: %d | Tracked: %d | Finished: %d | Remaining: %d | ETA: %s" "$running" "$pending" "$tracked" "$finished" "$remaining" "$eta_str"
     
-    while [ $combo_index -lt $total ] && [ $tracked -lt 10 ]; do
+    while [ $combo_index -lt $total ] && [ $tracked -lt 24 ]; do
         combo="${combinations[$combo_index]}"
         job_output=$(sbatch 6_hybrid_single.sh "$combo" 2>&1)
         job_id=$(echo "$job_output" | grep -o 'Submitted batch job [0-9]*' | grep -o '[0-9]*')

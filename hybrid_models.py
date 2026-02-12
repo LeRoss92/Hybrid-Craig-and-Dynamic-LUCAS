@@ -11,6 +11,11 @@ def craig_BA_adapt(
     carbon_use_efficiency="constant",
     saturation="no",):
     Cp, Cb, Cm = y
+    # Clamp pools for rate computations to avoid non-physical negative states
+    # triggering unstable MM terms during integration.
+    Cp_pos = jnp.maximum(Cp, 1e-12)
+    Cb_pos = jnp.maximum(Cb, 1e-12)
+    Cm_pos = jnp.maximum(Cm, 1e-12)
     (
         I,
         CUE,
@@ -96,19 +101,19 @@ def craig_BA_adapt(
 
             return value_before * weight_before + value_after * weight_after
 
-    saturation_fraction = sat(tmb, Cg0m, Cm, qx)
-    total_turnover = mic_tur(kb, Cb, beta)
+    saturation_fraction = sat(tmb, Cg0m, Cm_pos, qx)
+    total_turnover = mic_tur(kb, Cb_pos, beta)
 
     to_Cm = saturation_fraction * total_turnover
     to_Cp = total_turnover - to_Cm
 
-    dCpdt = I - mic_dec(kp, Vmax_p, Cb, Km_p, Cp) + to_Cp
+    dCpdt = I - mic_dec(kp, Vmax_p, Cb_pos, Km_p, Cp_pos) + to_Cp
     dCbdt = (
-        ca_us_ef(CUE, Cg0b, Cb) * mic_dec(kp, Vmax_p, Cb, Km_p, Cp)
-        + ca_us_ef(CUE, Cg0b, Cb) * mic_dec(km, Vmax_m, Cb, Km_m, Cm)
+        ca_us_ef(CUE, Cg0b, Cb_pos) * mic_dec(kp, Vmax_p, Cb_pos, Km_p, Cp_pos)
+        + ca_us_ef(CUE, Cg0b, Cb_pos) * mic_dec(km, Vmax_m, Cb_pos, Km_m, Cm_pos)
         - total_turnover
     )
-    dCmdt = to_Cm - mic_dec(km, Vmax_m, Cb, Km_m, Cm)
+    dCmdt = to_Cm - mic_dec(km, Vmax_m, Cb_pos, Km_m, Cm_pos)
 
     return jnp.array([dCpdt, dCbdt, dCmdt])
 

@@ -7,7 +7,7 @@
 #SBATCH -o 6_hybrid_outputs/slurm-%j.out
 
 source ~/.bashrc
-micromamba activate DPL_JAX_copy
+micromamba activate hybrid-lucas
 
 mkdir -p 6_hybrid_outputs
 combo="$1"
