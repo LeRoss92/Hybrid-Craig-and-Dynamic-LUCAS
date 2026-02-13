@@ -46,7 +46,7 @@ def main():
     model_sens = sensitivities[(sensitivities["md"] == args.md) & (sensitivities["mt"] == args.mt) & (sensitivities["sat"] == args.sat) & (sensitivities["temp"] == ("dynamic" if use_dynamic else "steady"))].iloc[0] # pick for this combination
     param_sens = model_sens.drop(labels=["md", "mt", "sat", "temp"]) # pick only parameters
     nonzero_params = [name for name, val in param_sens.items() if name != "I" and val != 0.0] # create list of non 0.0 (excluding I)
-    sorted_params = sorted(nonzero_params, key=lambda name: abs(param_sens[name]), reverse=True) # sort this list by abs()
+    sorted_params = sorted(nonzero_params, key=lambda name: abs(param_sens[name])) # sort this list by abs()
     for i, name in enumerate(sorted_params, start=0): # loop over list
         global_names = [n for n, v in param_sens.items() if n != "I" and v == 0.0] + sorted_params[:i] # create which are to use global (0.0 and 0,1,2,3... of the ones in the list)
         print(global_names)
