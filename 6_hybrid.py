@@ -9,7 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from hybrid_models import craig_BA_adapt, analytical_steady_state
-from hybrid_config import default_param_ranges, predictors_dynamic, predictors_2015, predictors_2018, log_cols
+from config import default_param_ranges, predictors_dynamic, predictors_2015, predictors_2018, log_cols
 from hybrid_utils import vector_field, simulate_final_state, init_mlp, build_param_matrix, normalize_targets, eval_loss, init_adam, eval_r2, train_step
 
 dt0 = 0.05 # years
@@ -44,13 +44,12 @@ def main():
 
     sensitivities = pd.read_csv("sensitivities.csv") # load importances
     model_sens = sensitivities[(sensitivities["md"] == args.md) & (sensitivities["mt"] == args.mt) & (sensitivities["sat"] == args.sat) & (sensitivities["temp"] == ("dynamic" if use_dynamic else "steady"))].iloc[0] # pick for this combination
-    param_sens = model_sens.drop(labels=["md", "mt", "sat", "temp"]) # pick only parameters
+    param_sens = model_sens.drop(labels=["md", "mt", "sat", "temp", "y0_Cp", "y0_Cb", "y0_Cm"]) # pick only parameters
     nonzero_params = [name for name, val in param_sens.items() if name != "I" and val != 0.0] # create list of non 0.0 (excluding I)
     sorted_params = sorted(nonzero_params, key=lambda name: abs(param_sens[name])) # sort this list by abs()
-    for i, name in enumerate(sorted_params, start=0): # loop over list
-        global_names = [n for n, v in param_sens.items() if n != "I" and v == 0.0] + sorted_params[:i] # create which are to use global (0.0 and 0,1,2,3... of the ones in the list)
+    for i in range(len(sorted_params)+1): # loop over list
+        global_names = [n for n, v in param_sens.items() if v == 0.0] + sorted_params[:i] # create which are to use global (0.0 and 0,1,2,3... of the ones in the list)
         print(global_names)
-
         param_names = list(default_param_ranges.keys())
         param_mins = jnp.array([default_param_ranges[name]["min"] for name in param_names])
         param_maxs = jnp.array([default_param_ranges[name]["max"] for name in param_names])

@@ -8,13 +8,15 @@ import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore', category=RuntimeWarning, message='invalid value encountered in divide')
 # Also suppress warnings from numpy's corrcoef function
 np.seterr(divide='ignore', invalid='ignore')
+# Suppress sklearn Parallel/delayed UserWarning from GridSearchCV (sklearn uses delayed with joblib.Parallel internally)
+warnings.filterwarnings('ignore', category=UserWarning, message='.*sklearn.utils.parallel.delayed.*')
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import GridSearchCV
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import make_scorer, r2_score, mean_squared_error
 from sklearn.base import clone
-from joblib import Parallel, delayed
+from sklearn.utils.parallel import Parallel, delayed
 import importlib.util
 
 spec = importlib.util.spec_from_file_location("models_module", "5_models.py")
@@ -109,6 +111,8 @@ def process_fold(fold_idx, X_train_all, y_train_all, split_train_labels, X_test,
     # Set matplotlib backend in worker process to avoid X11 warnings
     import matplotlib
     matplotlib.use('Agg', force=True)
+    # Suppress sklearn Parallel/delayed UserWarning (raised by GridSearchCV when n_jobs>1 in worker processes)
+    warnings.filterwarnings('ignore', category=UserWarning, message='.*sklearn.utils.parallel.delayed.*')
     
     val_mask = split_train_labels == fold_idx # get respective fold indices (test)
     train_mask = ~val_mask # everything else valid is train
@@ -256,10 +260,13 @@ def compute_pred_median(df, prefix, years):
     For each year, find prediction columns by prefix + year, compute median, add as new column.
     E.g., prefix="OC_sc_g_kg_", years=[2009,2015,2018] looks for "OC_sc_g_kg_2009_pred_*" columns.
     """
+    median_cols = {}
     for year in years:
         col_base = f"{prefix}{year}_pred_"
         pred_cols = [col for col in df.columns if col.startswith(col_base) and col[len(col_base):].isdigit()]
         # Sort by integer suffix, if present
         pred_cols.sort(key=lambda s: int(s.split("_")[-1]) if s.split("_")[-1].isdigit() else 0)
         median_col = f"{prefix}{year}_pred_median"
-        df[median_col] = df[pred_cols].median(axis=1, skipna=True)
+        median_cols[median_col] = df[pred_cols].median(axis=1, skipna=True)
+    df = pd.concat([df, pd.DataFrame(median_cols, index=df.index)], axis=1)
+    return df
