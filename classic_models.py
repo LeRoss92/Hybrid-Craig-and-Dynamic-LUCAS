@@ -40,15 +40,41 @@ def get_models(seed=4210):
                     include_bias=False)), # already exists
                 ("ridge", Ridge(alpha=1.0)) ]),
             'params': {
-                'spline__n_knots': [2, 3, 4],                   # 2 = linear regression, 3=two pieces
+                'spline__n_knots': [5],    #, 5               # 2 = linear regression, 3=two pieces
                 'spline__degree': [1],                       # linear vs polynomial splines
                 'spline__include_bias': [False],                # True: x=y=0
-                'interactions__degree': [1, 2],                 # 1: no interactions, 2: pairwise...
-                'ridge__alpha': [1e-6, 0.01, 0.1],    # 1e-6: minimal regularization for numerical stability
+                'interactions__degree': [2],    # 2            # 1: no interactions, 2: pairwise...
+                'ridge__alpha': [0.01],       #  0.001, 0.5          # 1e-6: minimal regularization for numerical stability
             },
             'n_jobs': 32,  # Use workers for GridSearchCV (when not parallelizing candidates)
             'n_jobs_feature_selection': 32  # Parallelize candidate feature evaluation (one candidate per worker)
         },
+        'XGB': {
+            'model': XGBRegressor(
+                n_estimators=50,
+                learning_rate=0.1,
+                max_depth=6,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                tree_method='hist',
+                device="cpu",
+                n_jobs=1,
+                verbosity=0,
+                random_state=seed
+            ),
+            'n_jobs': 1,
+            'params': {
+                'n_estimators': [150],
+                'max_depth': [5],
+                'learning_rate': [0.05],
+                'subsample': [0.8],
+                'colsample_bytree': [0.8], # 0.5
+                'min_child_weight': [1] # , 5
+            },
+            'n_jobs_feature_selection': 5
+        },
+
+
         'DecisionTree': {
             'model': DecisionTreeRegressor(random_state=seed),
             'params': {'max_depth': [5, 7, 9], 'min_samples_split': [10, 20], 'min_samples_leaf': [5, 10]},
@@ -133,17 +159,11 @@ def get_models(seed=4210):
             'n_iter': 10
         },
         'NeuralNet': {
-            'model': MLPRegressor(random_state=seed, max_iter=1000, early_stopping=True, validation_fraction=0.1, n_iter_no_change=20),
+            'model': MLPRegressor(random_state=seed, max_iter=100, early_stopping=True, validation_fraction=0.1, n_iter_no_change=20),
             'scaler': StandardScaler(),
-            'params': {'hidden_layer_sizes': [(32,), (64,), (32, 16)], 'activation': ['relu'], 'alpha': [0.001, 0.01], 'learning_rate_init': [0.001, 0.01]},
+            'params': {'hidden_layer_sizes': [(16,)], 'activation': ['relu'], 'alpha': [0.01], 'learning_rate_init': [0.01]},
+            #                               (32,) , (64,), (32, 16)                0.001,                      0.001, 
             'n_iter': 6
-        },
-        'XGB': {
-            'model': XGBRegressor(n_estimators=50, learning_rate=0.1, max_depth=6, subsample=0.8, colsample_bytree=0.8,
-                                  tree_method='gpu_hist', predictor='gpu_predictor', n_jobs=-1, verbosity=0, random_state=seed), # 
-            'scaler': None,
-            'params': {'n_estimators': [100], 'learning_rate': [0.1], 'max_depth': [6, 8], 'subsample': [0.8], 'colsample_bytree': [0.8]},
-            'n_iter': 4
         },
         
 

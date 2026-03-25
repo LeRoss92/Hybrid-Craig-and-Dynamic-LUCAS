@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 import pandas as pd
+import os
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend to avoid X11 warnings
 import matplotlib.pyplot as plt
@@ -19,10 +20,23 @@ from sklearn.base import clone
 from sklearn.utils.parallel import Parallel, delayed
 import importlib.util
 
-spec = importlib.util.spec_from_file_location("models_module", "5_models.py")
-models_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(models_module)
-get_models = models_module.get_models
+from classic_models import get_models
+
+from config import get_onehot_cols_for_config
+
+
+def normalize_config(c):
+    """Convert config with predictors/log_predictors lists to {predictors: {normal, log}, onehot_prefixes}."""
+    if isinstance(c.get('predictors'), dict):
+        return c
+    preds = c.get('predictors') or []
+    log_preds = c.get('log_predictors') or []
+    return {
+        **c,
+        'predictors': {"normal": tuple(preds), "log": tuple(log_preds)},
+        'onehot_prefixes': c.get('onehot_prefixes', c.get('categoricals', [])),
+    }
+
 
 def get_array(df, col):
     arr = np.array(df[col]) # df column -> np
@@ -106,13 +120,39 @@ def plot_pred_tar_dist(target_name, feature_names, y_big_train, X_big_train):
     plt.savefig(f'5_results/5_{target_name}_distributions.png', dpi=150, bbox_inches='tight')
     plt.close()
 
-def process_fold(fold_idx, X_train_all, y_train_all, split_train_labels, X_test, y_test, target_name, feature_names, config, all_MODELS, fold_values):
-    """Process a single fold - can be called in parallel"""
+def _eval_cand(c, sel, Xp, yp, mc, cfg, scorer):
+    """Evaluate adding a single feature index c to selection sel."""
+    fs = sel + [c]
+    n_jobs_gs = mc.get('n_jobs', 1)
+    s = GridSearchCV(mc['model'], mc['params'], cv=cfg['n_folds_HP_opt'], scoring=scorer, n_jobs=n_jobs_gs, verbose=0)
+    s.fit(Xp[:, fs], yp)
+    return (c, s.best_score_, s)
+
+def _eval_cand_group(indices, sel, Xp, yp, mc, cfg, scorer):
+    """Evaluate adding a whole group (all indices) to selection sel."""
+    fs = sel + indices
+    n_jobs_gs = mc.get('n_jobs', 1)
+    s = GridSearchCV(mc['model'], mc['params'], cv=cfg['n_folds_HP_opt'], scoring=scorer, n_jobs=n_jobs_gs, verbose=0)
+    s.fit(Xp[:, fs], yp)
+    return (tuple(indices), s.best_score_, s)
+
+def process_fold(fold_idx, X_train_all, y_train_all, split_train_labels, X_test, y_test, target_name, feature_names, config, all_MODELS, fold_values, feature_groups=None):
+    """Process a single fold - can be called in parallel.
+    feature_groups: dict mapping group_id (str) -> list of feature indices. These are selected all-or-nothing.
+    """
     # Set matplotlib backend in worker process to avoid X11 warnings
     import matplotlib
     matplotlib.use('Agg', force=True)
     # Suppress sklearn Parallel/delayed UserWarning (raised by GridSearchCV when n_jobs>1 in worker processes)
     warnings.filterwarnings('ignore', category=UserWarning, message='.*sklearn.utils.parallel.delayed.*')
+    # Pin each fold worker to one visible GPU for multi-GPU parallel runs.
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+    visible_gpus = [g.strip() for g in visible.split(",") if g.strip() != ""]
+    if visible_gpus:
+        selected_gpu = visible_gpus[int(fold_idx) % len(visible_gpus)]
+        os.environ["CUDA_VISIBLE_DEVICES"] = selected_gpu
+    else:
+        selected_gpu = "all-visible"
     
     val_mask = split_train_labels == fold_idx # get respective fold indices (test)
     train_mask = ~val_mask # everything else valid is train
@@ -130,31 +170,46 @@ def process_fold(fold_idx, X_train_all, y_train_all, split_train_labels, X_test,
     y_val_p = target_scaler.transform(y_val.reshape(-1, 1)).flatten()
     if fold_idx == fold_values[0]:
         plot_pred_tar_dist(target_name, feature_names, y_train_p, X_train_p)
-    print(f"TARGET: {target_name} | Train={len(X_train_all)} | Test={len(X_test)} | Fold {fold_idx}")
+    print(f"TARGET: {target_name} | Train={len(X_train)} Val={len(X_val)} | Test={len(X_test)} | Fold {fold_idx}")
     
+    feature_groups = feature_groups or {}
+    all_group_indices = set()
+    for idx_list in feature_groups.values():
+        all_group_indices.update(idx_list)
+    remaining_singles = [i for i in range(X_train_p.shape[1]) if i not in all_group_indices]
+    remaining_groups = list(feature_groups.items())  # [(group_id, [indices]), ...]
+
     fold_results = []
     for model_type in config['models']:
-            # -------------------- Additive Feature Selection --------------------
-            selected_idx = [] # store selected (best in each round)
-            remaining_idx = list(range(X_train_p.shape[1])) # initialize possible features to select
-            model_config = all_MODELS[model_type] # get model info
-            kge_scorer = make_scorer(kge, greater_is_better=True) # use KGE for selection
-            best_overall_score, best_overall_model, best_overall_features, best_overall_hyperparams = -np.inf, None, None, None # initialize to get the best model at best feature selection
-            n_jobs_gridsearch = model_config.get('n_jobs', 1)  # Use n_jobs for GridSearchCV
-            
-            for _ in range(min(config['max_features'], len(remaining_idx))): # loop until enough features found
-                best_idx, best_score = None, -np.inf # initialize to store presently best in this round
-                best_search = None # initilize to store best of this features selection round
-                for cand_idx in remaining_idx: # loop over possibles to select
-                    feat_set = selected_idx + [cand_idx] # add respective possible to select
-                    search = GridSearchCV(model_config['model'], model_config['params'], cv=config['n_folds_HP_opt'], scoring=kge_scorer, n_jobs=n_jobs_gridsearch, verbose=0) # set up search
-                    search.fit(X_train_p[:, feat_set], y_train_p) # find best model
-                    if search.best_score_ > best_score: # if new best (of this feature selection round)
-                        best_score, best_idx, best_search = search.best_score_, cand_idx, search # than replace with this
-                
-                selected_idx.append(best_idx) # select
-                remaining_idx.remove(best_idx) # remove selected from the futures possible to select
-                if best_score > best_overall_score: # if new best (of this fold + model)
+            selected_idx = []
+            remaining_s = list(remaining_singles)
+            remaining_g = list(remaining_groups)
+            model_config = all_MODELS[model_type]
+            kge_scorer = make_scorer(kge, greater_is_better=True)
+            best_overall_score, best_overall_model, best_overall_features, best_overall_hyperparams = -np.inf, None, None, None
+            # XGB uses GPU per fold; for LinReg/Piecewise allow candidate parallelism (2TB node)
+            n_jobs_c = 1 if model_type == 'XGB' else config.get('n_jobs_candidates', 6)
+            n_candidates = len(remaining_s) + len(remaining_g)
+            for _ in range(min(config['max_features'], n_candidates)):
+                cand_results = []
+                if n_jobs_c > 1:
+                    cand_results.extend(Parallel(n_jobs=n_jobs_c, backend='loky')(delayed(_eval_cand)(c, selected_idx, X_train_p, y_train_p, model_config, config, kge_scorer) for c in remaining_s))
+                    cand_results.extend(Parallel(n_jobs=n_jobs_c, backend='loky')(delayed(_eval_cand_group)(idxs, selected_idx, X_train_p, y_train_p, model_config, config, kge_scorer) for _, idxs in remaining_g))
+                else:
+                    cand_results.extend([_eval_cand(c, selected_idx, X_train_p, y_train_p, model_config, config, kge_scorer) for c in remaining_s])
+                    cand_results.extend([_eval_cand_group(idxs, selected_idx, X_train_p, y_train_p, model_config, config, kge_scorer) for _, idxs in remaining_g])
+                if not cand_results:
+                    break
+                best_result = max(cand_results, key=lambda r: r[1])
+                best_cand, best_score, best_search = best_result
+                if isinstance(best_cand, tuple):
+                    selected_idx.extend(best_cand)
+                    best_idxs_set = set(best_cand)
+                    remaining_g = [(gid, idxs) for gid, idxs in remaining_g if set(idxs) != best_idxs_set]
+                else:
+                    selected_idx.append(best_cand)
+                    remaining_s.remove(best_cand)
+                if best_score > best_overall_score:
                     best_overall_score, best_overall_features, best_overall_hyperparams, best_overall_model = best_score, selected_idx.copy(), best_search.best_params_, best_search.best_estimator_
             # -------------------- Train best model and evaluate --------------------
             final_model = clone(best_overall_model)
@@ -190,42 +245,70 @@ def process_fold(fold_idx, X_train_all, y_train_all, split_train_labels, X_test,
             })
     return fold_results
 
-def find(df, config, split_col="split"):
+def find(df, config, split_col="split", results_suffix=None, fold_filter=None):
     results = pd.DataFrame()
     target_name = config["target_name"]
     all_MODELS = get_models(config['seed'])
     feature_names = config['predictors']["normal"] + config['predictors']["log"]
-    X_raw, y, valid_mask = prepare_data(df, target_name, feature_names) # filter for valid samples (with y)
-    X_raw[:, len(config['predictors']["normal"]):] = np.log1p(X_raw[:, len(config['predictors']["normal"]):])
-    split_labels = np.array(df.loc[valid_mask, split_col]) # get the split labels (only where target exists)
-    test_mask = split_labels == 'test' # identify final test samples
-    X_test, y_test = X_raw[test_mask], y[test_mask] # get test data
-    X_train_all, y_train_all = X_raw[~test_mask], y[~test_mask] # get train/eval samples
-    split_train_labels = split_labels[~test_mask] # remove test
-    fold_values = sorted({int(v) for v in pd.unique(split_train_labels) if v != 'test'}) # sort indices according to fold
+    onehot_cols = []
+    feature_groups = {}
+    if get_onehot_cols_for_config and config.get('onehot_prefixes'):
+        onehot_cols, onehot_specs = get_onehot_cols_for_config(df, config)
+        base_len = len(config['predictors']["normal"]) + len(config['predictors']["log"])
+        for prefix in config['onehot_prefixes']:
+            if prefix in onehot_specs:
+                start = base_len + sum(len(onehot_specs[p]) for p in config['onehot_prefixes'] if config['onehot_prefixes'].index(p) < config['onehot_prefixes'].index(prefix))
+                feature_groups[prefix] = list(range(start, start + len(onehot_specs[prefix])))
+        feature_names = list(feature_names) + onehot_cols
+    X_raw, y, valid_mask = prepare_data(df, target_name, feature_names)
+    n_normal = len(config['predictors']["normal"])
+    n_log = len(config['predictors']["log"])
+    X_raw[:, n_normal:n_normal + n_log] = np.log1p(X_raw[:, n_normal:n_normal + n_log])
+    split_labels = np.array(df.loc[valid_mask, split_col])
+    test_mask = split_labels == 'test'
+    X_test, y_test = X_raw[test_mask], y[test_mask]
+    X_train_all, y_train_all = X_raw[~test_mask], y[~test_mask]
+    split_train_labels = split_labels[~test_mask]
+    fold_values = sorted({int(v) for v in pd.unique(split_train_labels) if v != 'test'})
+    if fold_filter is not None:
+        if fold_filter not in fold_values:
+            raise ValueError(f"fold_filter={fold_filter} not in fold_values {fold_values}")
+        fold_values = [fold_filter]
 
-    # ==================================== Outer CV using precomputed folds - PARALLELIZED ====================================
-    n_jobs_folds = config.get('n_jobs_folds', 1)  # Number of folds to process in parallel
+    n_jobs_folds = config.get('n_jobs_folds', 1)
     if n_jobs_folds > 1:
-        # Parallelize fold processing
         fold_results_list = Parallel(n_jobs=n_jobs_folds, backend='loky')(
-            delayed(process_fold)(fold_idx, X_train_all, y_train_all, split_train_labels, X_test, y_test, target_name, feature_names, config, all_MODELS, fold_values)
+            delayed(process_fold)(fold_idx, X_train_all, y_train_all, split_train_labels, X_test, y_test, target_name, feature_names, config, all_MODELS, fold_values, feature_groups)
             for fold_idx in fold_values
         )
-        # Flatten results from all folds
         for fold_results in fold_results_list:
             results = pd.concat([results, pd.DataFrame(fold_results)], ignore_index=True)
     else:
-        # Sequential processing
         for fold_idx in fold_values:
-            fold_results = process_fold(fold_idx, X_train_all, y_train_all, split_train_labels, X_test, y_test, target_name, feature_names, config, all_MODELS, fold_values)
+            fold_results = process_fold(fold_idx, X_train_all, y_train_all, split_train_labels, X_test, y_test, target_name, feature_names, config, all_MODELS, fold_values, feature_groups)
             results = pd.concat([results, pd.DataFrame(fold_results)], ignore_index=True)
     
-    results.to_pickle(f'5_results/5_{target_name}_results.pkl')
+    out_name = f'5_results/5_{target_name}'
+    if results_suffix is not None:
+        out_name = f"{out_name}_{results_suffix}"
+    results.to_pickle(f'{out_name}_results.pkl')
     return results
 
-def apply_models(df, results, pred_config):
+def apply_models(df, results, pred_config, model_year_suffix=None, col_suffix=None, train_config=None):
+    """Apply trained models for prediction.
+    When doing cross-year prediction (pred_config != training config), pass train_config
+    so the feature structure (incl. one-hot) matches what the model was trained on.
+    If train_config is None, use pred_config for everything (same-config application).
+    """
     pred_columns = {} # to store predictions
+    feature_names = pred_config['predictors']['normal'] + pred_config['predictors']['log']
+    onehot_config = train_config if train_config is not None else pred_config
+    onehot_cols = []
+    if get_onehot_cols_for_config and onehot_config.get('onehot_prefixes'):
+        onehot_cols, _ = get_onehot_cols_for_config(df, onehot_config)
+        feature_names = list(feature_names) + onehot_cols
+    n_normal = len(pred_config['predictors']['normal'])
+    n_log = len(pred_config['predictors']['log'])
     for fold_idx in results['fold'].unique(): # one prediction per fold (uncertainty)
         fold_results = results[results['fold'] == fold_idx] # filter to have evaluation results only of that fold
         best_model_row = fold_results.loc[fold_results['val_KGE'].idxmax()] # identify best model (via val, not test!)
@@ -233,15 +316,18 @@ def apply_models(df, results, pred_config):
         preprocessor = best_model_row['preprocessor']
         target_scaler = best_model_row['target_scaler']
         feature_indices = best_model_row['feature_indices']
-        feature_names = pred_config['predictors']['normal'] + pred_config['predictors']['log'] # get new feature names (of the year to predict)
-        X_raw = np.column_stack([get_array(df, col) for col in feature_names]) # with the indices of the old features (where model was trained on) identify new features to use
-        X_raw[:, len(pred_config['predictors']['normal']):] = np.log1p(X_raw[:, len(pred_config['predictors']['normal']):]) # log the features to log
+        X_raw = np.column_stack([get_array(df, col) for col in feature_names])
+        X_raw[:, n_normal:n_normal + n_log] = np.log1p(X_raw[:, n_normal:n_normal + n_log])
         X_p = preprocessor.transform(X_raw) # impute and zscore (with statistics of model training)
         y_pred_scaled = model.predict(X_p[:, feature_indices]) # predict
         y_pred = target_scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten() # re-scale predictions to original scale
         if pred_config['target_log']: # re-log if target was logged
             y_pred = np.expm1(y_pred)
-        pred_columns[f"{pred_config['target_name']}_pred_{fold_idx}"] = y_pred # store predictions
+        base = pred_config['target_name']
+        if col_suffix is not None:
+            base = f"{base}_{col_suffix}"
+        col_name = f"{base}_pred_{model_year_suffix}_{fold_idx}" if model_year_suffix is not None else f"{base}_pred_{fold_idx}"
+        pred_columns[col_name] = y_pred # store predictions
     return pd.concat([df, pd.DataFrame(pred_columns, index=df.index)], axis=1) # add predictions
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -255,18 +341,60 @@ def haversine(lat1, lon1, lat2, lon2):
     r = 6371000 # Radius of earth in meters
     return c * r
 
-def compute_pred_median(df, prefix, years):
-    """
-    For each year, find prediction columns by prefix + year, compute median, add as new column.
-    E.g., prefix="OC_sc_g_kg_", years=[2009,2015,2018] looks for "OC_sc_g_kg_2009_pred_*" columns.
-    """
+def apply_models_per_method(df, results, pred_config, fold_idx):
+    """Add n_methods * n_prediction_years columns. One prediction column per (model_type, target)."""
+    feature_names = pred_config['predictors']['normal'] + pred_config['predictors']['log']
+    onehot_cols = []
+    if get_onehot_cols_for_config and pred_config.get('onehot_prefixes'):
+        onehot_cols, _ = get_onehot_cols_for_config(df, pred_config)
+        feature_names = list(feature_names) + onehot_cols
+    n_normal = len(pred_config['predictors']['normal'])
+    n_log = len(pred_config['predictors']['log'])
+
+    fold_results = results[results["fold"] == fold_idx]
+    pred_columns = {}
+    for _, row in fold_results.iterrows():
+        model_type = row["model_type"]
+        model = row["model"]
+        preprocessor = row["preprocessor"]
+        target_scaler = row["target_scaler"]
+        feature_indices = row["feature_indices"]
+
+        X_raw = np.column_stack([get_array(df, col) for col in feature_names])
+        X_raw[:, n_normal:n_normal + n_log] = np.log1p(X_raw[:, n_normal:n_normal + n_log])
+        n_expected = preprocessor.named_steps['imputer'].n_features_in_
+        n_actual = X_raw.shape[1]
+        if n_expected != n_actual:
+            print(f"FEATURE MISMATCH: preprocessor expects {n_expected}, got {n_actual}")
+            print(f"  target: {pred_config['target_name']} | model: {model_type}")
+            print(f"  onehot_prefixes: {pred_config.get('onehot_prefixes', [])}")
+            print(f"  feature_names ({n_actual}): {feature_names}")
+        X_p = preprocessor.transform(X_raw)
+        y_pred_scaled = model.predict(X_p[:, feature_indices])
+        y_pred = target_scaler.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
+        if pred_config["target_log"]:
+            y_pred = np.expm1(y_pred)
+
+        col_name = f"{pred_config['target_name']}_{model_type}"
+        pred_columns[col_name] = y_pred
+
+    return pd.concat([df, pd.DataFrame(pred_columns, index=df.index)], axis=1)
+
+
+def compute_pred_median(df, prefix, years, cross_pairs=None, col_suffix=None):
     median_cols = {}
     for year in years:
-        col_base = f"{prefix}{year}_pred_"
+        year_key = f"{year}_{col_suffix}" if col_suffix is not None else year
+        col_base = f"{prefix}{year_key}_pred_"
         pred_cols = [col for col in df.columns if col.startswith(col_base) and col[len(col_base):].isdigit()]
-        # Sort by integer suffix, if present
         pred_cols.sort(key=lambda s: int(s.split("_")[-1]) if s.split("_")[-1].isdigit() else 0)
-        median_col = f"{prefix}{year}_pred_median"
-        median_cols[median_col] = df[pred_cols].median(axis=1, skipna=True)
+        median_cols[f"{prefix}{year_key}_pred_median"] = df[pred_cols].median(axis=1, skipna=True)
+    if cross_pairs:
+        for target_year, model_year in cross_pairs:
+            year_key = f"{target_year}_{col_suffix}" if col_suffix is not None else target_year
+            col_base = f"{prefix}{year_key}_pred_{model_year}_"
+            pred_cols = [col for col in df.columns if col.startswith(col_base) and col[len(col_base):].isdigit()]
+            pred_cols.sort(key=lambda s: int(s.split("_")[-1]) if s.split("_")[-1].isdigit() else 0)
+            median_cols[f"{prefix}{year_key}_pred_{model_year}_median"] = df[pred_cols].median(axis=1, skipna=True)
     df = pd.concat([df, pd.DataFrame(median_cols, index=df.index)], axis=1)
     return df
