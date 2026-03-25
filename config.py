@@ -474,27 +474,15 @@ TARGET_CONFIG = {
     },
 }
 
-def get_onehot_cols_for_config(df, config):
-    """Resolve categorical columns from df. config uses 'categoricals' or 'onehot_prefixes'."""
-    prefixes = config.get('categoricals', config.get('onehot_prefixes', []))
-    cols = []
-    specs = {}
-    for p in prefixes:
-        group_cols = [c for c in df.columns if c.startswith(f'{p}_')]
-        if group_cols:
-            cols.extend(group_cols)
-            specs[p] = group_cols
-    return cols, specs
-
-
 TRAIN_DEFAULTS = {
-    'models': ['LinReg'],#, 'XGB', 'Piecewise_Linear_Reg'], # 'XGB'
+    'models': ['LinReg', 'XGB', 'Piecewise_Linear_Reg'], # 'XGB'
     'seed': 42,
     'max_features': 20,
     'n_folds_HP_opt': 3, 
     'n_jobs_folds': 8,
+    'vars_order': ['BD', 'MAOC', 'MIC', 'dSOC_15_18', 'dSOC_09_18', 'SOC09', 'SOC18', 'SOC15'],
+    'N_JOBS': 70
 }
-
 
 # Legacy exports for 6_hybrid, 7_analysis, sensitivity_analysis
 predictors_dynamic = (

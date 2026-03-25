@@ -40,7 +40,7 @@ def get_models(seed=4210):
                     include_bias=False)), # already exists
                 ("ridge", Ridge(alpha=1.0)) ]),
             'params': {
-                'spline__n_knots': [5],    #, 5               # 2 = linear regression, 3=two pieces
+                'spline__n_knots': [3],    #, 5               # 2 = linear regression, 3=two pieces
                 'spline__degree': [1],                       # linear vs polynomial splines
                 'spline__include_bias': [False],                # True: x=y=0
                 'interactions__degree': [2],    # 2            # 1: no interactions, 2: pairwise...
@@ -75,42 +75,41 @@ def get_models(seed=4210):
         },
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         'DecisionTree': {
             'model': DecisionTreeRegressor(random_state=seed),
             'params': {'max_depth': [5, 7, 9], 'min_samples_split': [10, 20], 'min_samples_leaf': [5, 10]},
             'n_jobs': 32,  # Use workers for GridSearchCV (when not parallelizing candidates)
             'n_jobs_feature_selection': 32  # Parallelize candidate feature evaluation (one candidate per worker)
         }, 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         'PLSR': {
             'model': PLSRegression(n_components=1),
