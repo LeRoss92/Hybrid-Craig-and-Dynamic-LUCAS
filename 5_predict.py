@@ -63,9 +63,31 @@ def forward_select(X_train_p, X_val_p, y_train, y_val, model_config, params_comb
         remaining.remove(best_c) # remove the selected from the ones to test in next round
     return selected_idx # return indices of selected predictors
 
+def resolve_inference_spec(parent_config, inf_spec):
+    """Merge a TARGET_CONFIG['inference'] entry with the parent; omitted keys inherit from parent."""
+    return {
+        "target_name": inf_spec["target_name"],
+        "predictors": tuple(inf_spec.get("predictors", parent_config["predictors"])),
+        "log_predictors": tuple(inf_spec.get("log_predictors", parent_config["log_predictors"])),
+        "categoricals": list(inf_spec.get("categoricals", parent_config.get("categoricals", []))),
+    }
+
+def _r2_masked(y, pred):
+    if y is None:
+        return np.nan
+    m = np.isfinite(np.asarray(y)) & np.isfinite(np.asarray(pred))
+    if m.sum() < 2:
+        return np.nan
+    return r2_score(np.asarray(y)[m], np.asarray(pred)[m])
+
+def _safe_infer_col_suffix(target_name):
+    """Column-safe fragment for inference target name in pred_* column names."""
+    return str(target_name).replace(" ", "_").replace("/", "_")
+
 def process_one_fold(var, fold, X_train, y_train, X_val, y_val, X_test, y_test,
-                    train_idx, val_idx, test_idx, n_normal, n_log, pred_cols):
-    """Process a single (var, fold): per model, pick best (params, raw/log) by val R²; return metrics + predictions."""
+                    train_idx, val_idx, test_idx, n_normal, n_log, pred_cols, inference_bundles,
+                    X_train_all, X_val_all, X_test_all, y_train_all):
+    """Process a single (var, fold): fit on rows with y; metrics on those rows; predictions on all rows per split."""
     def to_signed_log(y): # log the abs value and give it sign: log of negative (changes) makes problems otherwise
         return np.sign(y) * np.log1p(np.abs(y))
     def from_signed_log(y_log): # function to revert (when prediction)
@@ -133,6 +155,93 @@ def process_one_fold(var, fold, X_train, y_train, X_val, y_val, X_test, y_test,
                 pass # skip if this hyperparameter combo crashed
         if best_result is not None: # if any haperparameter combo worked:
             sel = best_result['selected']
+            tl = best_result['target_logged']
+            m_final = _make_model(model_config, best_result['params'], n_features=len(sel))
+            if tl:
+                m_final.fit(X_train_p[:, sel], to_signed_log(y_train))
+            else:
+                m_final.fit(X_train_p[:, sel], y_train)
+
+            def _predict_from_Xp(Xp):
+                raw = m_final.predict(Xp[:, sel])
+                return from_signed_log(raw) if tl else raw
+
+            inference_metrics = []
+            inference_preds = []
+            for ib in inference_bundles:
+                rec = {
+                    'inference_target': ib['target_name'],
+                    'train r2': np.nan,
+                    'val r2': np.nan,
+                    'test r2': np.nan,
+                    'frozen_main_model': False,
+                }
+                pred_pack = {
+                    'inference_target': ib['target_name'],
+                    'pred_train': None,
+                    'pred_val': None,
+                    'pred_test': None,
+                }
+                try:
+                    Xtr = np.asarray(ib['X_train'], dtype=float, order='C').copy()
+                    Xva = np.asarray(ib['X_val'], dtype=float, order='C').copy()
+                    Xte = np.asarray(ib['X_test'], dtype=float, order='C').copy()
+                    nn, nl = ib['n_normal'], ib['n_log']
+                    Xtr[:, nn:nn + nl] = np.log1p(Xtr[:, nn:nn + nl])
+                    Xva[:, nn:nn + nl] = np.log1p(Xva[:, nn:nn + nl])
+                    Xte[:, nn:nn + nl] = np.log1p(Xte[:, nn:nn + nl])
+                    ytr_i, yva_i, yte_i = ib['y_train'], ib['y_val'], ib['y_test']
+                    if Xtr.shape[1] == X_train.shape[1]:
+                        Xtr_p = preprocessor.transform(Xtr)
+                        Xva_p = preprocessor.transform(Xva)
+                        Xte_p = preprocessor.transform(Xte)
+                        rec['frozen_main_model'] = True
+                        ptr = _predict_from_Xp(Xtr_p)
+                        pva = _predict_from_Xp(Xva_p)
+                        pte = _predict_from_Xp(Xte_p)
+                    else:
+                        prep_i = Pipeline([
+                            ("imputer", SimpleImputer(strategy="median")),
+                            ("scaler", StandardScaler()),
+                        ])
+                        Xtr_p = prep_i.fit_transform(Xtr)
+                        Xva_p = prep_i.transform(Xva)
+                        Xte_p = prep_i.transform(Xte)
+                        m_i = _make_model(model_config, best_result['params'], n_features=len(sel))
+                        # Refit on inference-year X; use inference y only if present (≥2 finite), else main y_train
+                        use_inf_y = ytr_i is not None and np.isfinite(ytr_i).sum() >= 2
+                        y_fit_source = ytr_i if use_inf_y else y_train_all
+                        y_fit = to_signed_log(y_fit_source) if tl else y_fit_source
+                        fit_m = np.isfinite(y_fit) & np.all(np.isfinite(Xtr_p[:, sel]), axis=1)
+                        if fit_m.sum() < 2:
+                            inference_metrics.append(rec)
+                            inference_preds.append(pred_pack)
+                            continue
+                        m_i.fit(Xtr_p[fit_m][:, sel], y_fit[fit_m])
+                        def _pred_i(Xp):
+                            r = m_i.predict(Xp[:, sel])
+                            return from_signed_log(r) if tl else r
+                        ptr, pva, pte = _pred_i(Xtr_p), _pred_i(Xva_p), _pred_i(Xte_p)
+                    rec['train r2'] = _r2_masked(ytr_i, ptr)
+                    rec['val r2'] = _r2_masked(yva_i, pva)
+                    rec['test r2'] = _r2_masked(yte_i, pte)
+                    pred_pack['pred_train'] = ptr
+                    pred_pack['pred_val'] = pva
+                    pred_pack['pred_test'] = pte
+                except (ValueError, np.linalg.LinAlgError, RuntimeError):
+                    pass
+                inference_metrics.append(rec)
+                inference_preds.append(pred_pack)
+
+            def _prep_full_X(X_raw):
+                X = np.asarray(X_raw, dtype=float, order='C').copy()
+                X[:, n_normal:n_normal + n_log] = np.log1p(X[:, n_normal:n_normal + n_log])
+                return preprocessor.transform(X)
+
+            pred_train = _predict_from_Xp(_prep_full_X(X_train_all))
+            pred_val = _predict_from_Xp(_prep_full_X(X_val_all))
+            pred_test = _predict_from_Xp(_prep_full_X(X_test_all))
+
             fold_results.append({
                 'var': var,
                 'fold': fold,
@@ -143,13 +252,15 @@ def process_one_fold(var, fold, X_train, y_train, X_val, y_val, X_test, y_test,
                 'params': best_result['params'],
                 'target_logged': best_result['target_logged'],
                 'selected_predictors': [pred_cols[i] for i in sel],
-                'pred_train': best_result['pred_train'],
-                'pred_val': best_result['pred_val'],
-                'pred_test': best_result['pred_test'],
-                'train_idx': best_result['train_idx'],
-                'val_idx': best_result['val_idx'],
-                'test_idx': best_result['test_idx'],
+                'pred_train': pred_train,
+                'pred_val': pred_val,
+                'pred_test': pred_test,
+                'train_idx': train_idx,
+                'val_idx': val_idx,
+                'test_idx': test_idx,
                 'selected': sel,
+                'inference_metrics': inference_metrics,
+                'inference_preds': inference_preds,
             }) # save results (per model/fold)
     return fold_results
 
@@ -165,6 +276,12 @@ def get_onehot_cols_for_config(df, config):
             specs[p] = group_cols # add column names
     return cols, specs # return data and column names
 
+def _y_column_if_present(frame, col_name):
+    """Return float numpy y for rows in frame, or None if column missing (no ground truth for that target)."""
+    if col_name not in frame.columns:
+        return None
+    return frame[col_name].to_numpy(dtype=float)
+
 ######################################## create parallel tasks ########################################
 tasks = []
 for var in vars_order:
@@ -174,22 +291,49 @@ for var in vars_order:
     pred_cols = list(config['predictors']) + list(config['log_predictors']) + onehot_cols # all potential predictors together (1-hot might get selected individually)
     n_normal = len(config['predictors']) # number of normal distributed predictors
     n_log = len(config['log_predictors']) # numer of log normal distributed predictors
-    test = df[(df['split'] == 'test') & (df[target_name].notna())] # test are all rows where: test + actual target data
-    X_test = test[pred_cols].to_numpy(dtype=float) # get test X as array
-    y_test = test[target_name].to_numpy(dtype=float) # get test y as array
+    test_fit = df[(df['split'] == 'test') & (df[target_name].notna())] # labeled test (metrics)
+    X_test = test_fit[pred_cols].to_numpy(dtype=float) # get test X as array
+    y_test = test_fit[target_name].to_numpy(dtype=float) # get test y as array
     X_test[:, n_normal:n_normal + n_log] = np.log1p(X_test[:, n_normal:n_normal + n_log]) # log respective predictors (looks correct) 
     for fold in range(10): # loop over folds
-        train = df[(df['split'] != 'test') & (df['split'] != fold) & (df[target_name].notna())] # train is where: not test + not val + actual data
-        val = df[(df['split'] != 'test') & (df['split'] == fold) & (df[target_name].notna())] # val is where: not test + val + actual data
-        train_idx = train.index.to_numpy() # save train indices
-        val_idx = val.index.to_numpy() # save val indices
-        test_idx = test.index.to_numpy() # save test indices
-        X_train = train[pred_cols].to_numpy(dtype=float) # make train X array
-        y_train = train[target_name].to_numpy(dtype=float) # make train y array
-        X_val = val[pred_cols].to_numpy(dtype=float) # make val X array
-        y_val = val[target_name].to_numpy(dtype=float) # make val y array
+        train_fit = df[(df['split'] != 'test') & (df['split'] != fold) & (df[target_name].notna())]
+        val_fit = df[(df['split'] != 'test') & (df['split'] == fold) & (df[target_name].notna())]
+        train_all = df[(df['split'] != 'test') & (df['split'] != fold)]
+        val_all = df[(df['split'] != 'test') & (df['split'] == fold)]
+        test_all = df[(df['split'] == 'test')]
+        train_idx = train_all.index.to_numpy()
+        val_idx = val_all.index.to_numpy()
+        test_idx = test_all.index.to_numpy()
+        X_train = train_fit[pred_cols].to_numpy(dtype=float)
+        y_train = train_fit[target_name].to_numpy(dtype=float)
+        X_val = val_fit[pred_cols].to_numpy(dtype=float)
+        y_val = val_fit[target_name].to_numpy(dtype=float)
+        X_train_all = train_all[pred_cols].to_numpy(dtype=float)
+        X_val_all = val_all[pred_cols].to_numpy(dtype=float)
+        X_test_all = test_all[pred_cols].to_numpy(dtype=float)
+        y_train_all = train_all[target_name].to_numpy(dtype=float)
+        inference_bundles = []
+        for raw_inf in config.get('inference') or []:
+            inf = resolve_inference_spec(config, raw_inf)
+            oh_i, _ = get_onehot_cols_for_config(df, inf)
+            pc_i = list(inf['predictors']) + list(inf['log_predictors']) + oh_i
+            nn_i = len(inf['predictors'])
+            nl_i = len(inf['log_predictors'])
+            tn_i = inf['target_name']
+            inference_bundles.append({
+                'target_name': tn_i,
+                'X_train': train_all[pc_i].to_numpy(dtype=float),
+                'X_val': val_all[pc_i].to_numpy(dtype=float),
+                'X_test': test_all[pc_i].to_numpy(dtype=float),
+                'y_train': _y_column_if_present(train_all, tn_i),
+                'y_val': _y_column_if_present(val_all, tn_i),
+                'y_test': _y_column_if_present(test_all, tn_i),
+                'n_normal': nn_i,
+                'n_log': nl_i,
+            })
         tasks.append((var, fold, X_train, y_train, X_val, y_val, X_test.copy(), y_test.copy(),
-                      train_idx, val_idx, test_idx, n_normal, n_log, pred_cols)) # one task pre variable and fold (n_vars*n_folds=n_tasks)
+                      train_idx, val_idx, test_idx, n_normal, n_log, pred_cols, inference_bundles,
+                      X_train_all, X_val_all, X_test_all, y_train_all))
 
 ######################################## compute ########################################
 results = Parallel(n_jobs=N_JOBS, backend='loky')(delayed(process_one_fold)(*task) for task in tasks)
@@ -210,22 +354,45 @@ selection_meta_df = pd.DataFrame([
         'params': r['params'],
         'target_logged': r['target_logged'],
         'selected_predictors': r['selected_predictors'],
+        'inference_metrics': r.get('inference_metrics', []),
     }
     for r in results_flat
 ])
 # Full grid: len(vars_order) * n_folds * n_models rows (fewer if a model never converges)
 print(f"Selection metadata rows: {len(selection_meta_df)} (max {len(vars_order) * 10 * len(MODEL_NAMES)})")
 
+_results_exclude = (
+    'pred_train', 'pred_val', 'pred_test', 'train_idx', 'val_idx', 'test_idx', 'inference_preds',
+)
 results_df = pd.DataFrame([
-    {**{k: v for k, v in r.items() if k not in ('pred_train', 'pred_val', 'pred_test', 'train_idx', 'val_idx', 'test_idx')},
+    {**{k: v for k, v in r.items() if k not in _results_exclude},
      'params': str(r['params'])}
     for r in results_flat
 ])
+# Long-form inference rows (one row per var/fold/model/inference_target) for filtering and tables
+inf_rows = []
+for r in results_flat:
+    for im in r.get('inference_metrics') or []:
+        inf_rows.append({
+            'var': r['var'],
+            'fold': r['fold'],
+            'model': r['model'],
+            'inference_target': im['inference_target'],
+            'inference_train_r2': im['train r2'],
+            'inference_val_r2': im['val r2'],
+            'inference_test_r2': im['test r2'],
+            'inference_frozen_main_model': im.get('frozen_main_model', False),
+        })
+inference_results_df = pd.DataFrame(inf_rows)
 with open("5_selection_meta.pkl", "wb") as f:
     pickle.dump(selection_meta_df, f)
 print(f"Saved selection metadata to 5_selection_meta.pkl ({len(selection_meta_df)} rows)")
+with open("5_results_df.pkl", "wb") as f:
+    pickle.dump({"results_df": results_df, "inference_by_target": inference_results_df}, f)
+print(f"Saved results_df + inference_by_target to 5_results_df.pkl ({len(results_df)} CV rows, {len(inference_results_df)} inference rows)")
 
 # Build output df: original df + one column per (var, fold, model) with train/val/test predictions
+# on every row in each split (not only rows with observed target). Inference preds use the same splits.
 out_df = df.copy()
 for r in results_flat:
     col = f"pred_{r['var']}_fold{r['fold']}_{r['model']}"
@@ -233,9 +400,20 @@ for r in results_flat:
     out_df.loc[r['train_idx'], col] = r['pred_train']
     out_df.loc[r['val_idx'], col] = r['pred_val']
     out_df.loc[r['test_idx'], col] = r['pred_test']
+    for ip in r.get('inference_preds') or []:
+        if ip.get('pred_train') is None:
+            continue
+        suf = _safe_infer_col_suffix(ip['inference_target'])
+        icol = f"pred_{r['var']}_fold{r['fold']}_{r['model']}_inf_{suf}"
+        out_df[icol] = np.nan
+        out_df.loc[r['train_idx'], icol] = ip['pred_train']
+        out_df.loc[r['val_idx'], icol] = ip['pred_val']
+        out_df.loc[r['test_idx'], icol] = ip['pred_test']
 with open("5_with_predictions.pkl", "wb") as f:
     pickle.dump(out_df, f)
-print(f"Saved predictions to 5_with_predictions.pkl ({len(out_df)} rows, {len([c for c in out_df.columns if c.startswith('pred_')])} pred columns)")
+_pred_cols = [c for c in out_df.columns if c.startswith('pred_')]
+_n_inf = sum(1 for c in _pred_cols if '_inf_' in c)
+print(f"Saved predictions to 5_with_predictions.pkl ({len(out_df)} rows, {len(_pred_cols)} pred columns incl. {_n_inf} inference)")
 
 import matplotlib.pyplot as plt
 model_order = [m for m in MODEL_NAMES if m in results_df['model'].values]

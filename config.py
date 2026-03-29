@@ -474,6 +474,17 @@ TARGET_CONFIG = {
     },
 }
 
+use_model = {
+    'BD': 'LinReg',
+    'MAOC': 'LinReg',
+    'MIC': 'LinReg',
+    'dSOC_15_18': 'XGB',
+    'dSOC_09_18': 'XGB',
+    'SOC09': 'XGB',
+    'SOC15': 'XGB',
+    'SOC18': 'XGB',
+}
+
 TRAIN_DEFAULTS = {
     'models': ['LinReg', 'XGB', 'Piecewise_Linear_Reg'], # 'XGB'
     'seed': 42,
@@ -517,24 +528,129 @@ predictors_2018 = (
 )
 log_cols = pred_groups['LUCAS log'][2015] + pred_groups['LUCAS log'][2018]
 
+BD = 1.3  # g cm^-3 (bulk density, used for unit conversions)
+
 default_param_ranges = {
-    "I": {"min": 0.05, "max": 2.0},
-    "CUE": {"min": 0.1, "max": 0.8},
-    "beta": {"min": 0.5, "max": 2.5},
-    "tmb": {"min": 0.1, "max": 1.0},
-    "Cg0b": {"min": 0.0005, "max": 10.0},
-    "Cg0m": {"min": 0.5 * 1.3, "max": 150 * 1.3},
-    "qx": {"min": 0.1, "max": 10.0},
-    "Vmax_p": {"min": 88 * 0.1, "max": 88 * 10.0},
-    "Vmax_m": {"min": 171 * 0.1, "max": 171 * 10.0},
-    "Km_p": {"min": 144 * 0.1 * 1.3, "max": 144 * 10.0 * 1.3},
-    "Km_m": {"min": 936 * 0.1 * 1.3, "max": 936 * 10.0 * 1.3},
-    "kp": {"min": 0.3 * 0.1, "max": 0.3 * 10.0},
-    "kb": {"min": 2 * 0.01, "max": 2 * 1.0},
-    "km": {"min": 0.09 * 0.1, "max": 0.09 * 10.0},
+    "I": {
+        "min": 0.05 * BD,
+        "default": 1.4 * BD,
+        "max": 2.0 * BD,
+        "unit": "mg C cm^-3 soil yr^-1",
+        "description": "Carbon input rate (enters particulate SOC pool)"
+    },
+    "CUE": {
+        "min": 0.1,
+        "default": 0.47,
+        "max": 0.8,
+        "unit": "-",
+        "description": "Microbial carbon use efficiency"
+    },
+    "beta": {
+        "min": 0.5,
+        "default": 1.0,
+        "max": 2.5,
+        "unit": "-",
+        "description": "Density‑dependence exponent for microbial turnover"
+    },
+    "tmb": {
+        "min": 0.1,
+        "default": "-",
+        "max": 1.0,
+        "unit": "-",
+        "description": "Proportion of microbial turnover transferred to mineral‑associated SOC"
+    },
+    "Cg0b": {
+        "min": 0.0005 * BD,
+        "default": 2.0 * BD,
+        "max": 10.0 * BD,
+        "unit": "mg C cm^-3 soil",
+        "description": "Microbial biomass at which microbial growth rate becomes zero"
+    },
+    "Cg0m": {
+        "min": 0.5 * BD,
+        "default": 27.0 * BD,
+        "max": 150 * BD,
+        "unit": "mg C cm^-3 soil",
+        "description": "Mineral‑associated SOC pool size at which growth rate of that pool is zero"
+    },
+    "qx": {
+        "min": 0.1,
+        "default": 1.0,
+        "max": 10.0,
+        "unit": "-",
+        "description": "Dimensionless scaling factor (not used in the model)"
+    },
+    "Vmax_p": {
+        "min": 88 * 0.1,
+        "default": 88.0,
+        "max": 88 * 10.0,
+        "unit": "yr^-1",
+        "description": "Maximum decomposition rate for particulate SOC"
+    },
+    "Vmax_m": {
+        "min": 171 * 0.1,
+        "default": 171.0,
+        "max": 171 * 10.0,
+        "unit": "yr^-1",
+        "description": "Maximum decomposition rate for mineral‑associated SOC"
+    },
+    "Km_p": {
+        "min": 144 * 0.1 * BD,
+        "default": 144.0,
+        "max": 144 * 10.0 * BD,
+        "unit": "mg C cm^-3 soil",
+        "description": "Half‑saturation constant for particulate SOC decomposition"
+    },
+    "Km_m": {
+        "min": 936 * 0.1 * BD,
+        "default": 936.0,
+        "max": 936 * 10.0 * BD,
+        "unit": "mg C cm^-3 soil",
+        "description": "Half‑saturation constant for mineral‑associated SOC decomposition"
+    },
+    "kp": {
+        "min": 0.3 * 0.1,
+        "default": 0.3,
+        "max": 0.3 * 10.0,
+        "unit": "yr^-1",
+        "description": "First‑order decay rate for particulate SOC"
+    },
+    "kb": {
+        "min": 2 * 0.01,
+        "default": 2.5,
+        "max": 2 * 1.0,
+        "unit": "yr^-1",
+        "description": "Microbial turnover rate"
+    },
+    "km": {
+        "min": 0.09 * 0.1,
+        "default": 0.09,
+        "max": 0.09 * 10.0,
+        "unit": "yr^-1",
+        "description": "First‑order decay rate for mineral‑associated SOC"
+    }
 }
+
 default_state_bounds = {
-    "Cp": {"min": 1.0, "max": 200.0},
-    "Cb": {"min": 0.00005, "max": 6.0},
-    "Cm": {"min": 0.05, "max": 80.0},
+    "Cp": {
+        "min": 1.0 * BD,
+        "default": "-",
+        "max": 200.0 * BD,
+        "unit": "mg C cm^-3 soil",
+        "description": "Particulate SOC – plant‑derived SOC in a minimally processed state"
+    },
+    "Cb": {
+        "min": 0.00005 * BD,
+        "default": "-",
+        "max": 6.0 * BD,
+        "unit": "mg C cm^-3 soil",
+        "description": "Microbial biomass carbon"
+    },
+    "Cm": {
+        "min": 0.05 * BD,
+        "default": "-",
+        "max": 80.0 * BD,
+        "unit": "mg C cm^-3 soil",
+        "description": "Mineral‑associated SOC"
+    }
 }

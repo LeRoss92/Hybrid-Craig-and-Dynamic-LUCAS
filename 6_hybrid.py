@@ -23,12 +23,12 @@ def log_and_stocks(df):
     helper_df = df.copy()
     for col in log_cols:
         helper_df[col] = np.log1p(helper_df[col])
-    helper_df["y2015_Cm"] = helper_df["BD 0-20_2015_pred_median"] * helper_df["OC_sc_g_kg_2015_pred_median"]
-    helper_df["y2015_Cb"] = helper_df["BD 0-20_2015_pred_median"] * helper_df["Cmic_2015_pred_median"]
-    helper_df["y2015_Cp"] = helper_df["BD 0-20_2015_pred_median"] * (helper_df["OC_2015"] - helper_df["OC_sc_g_kg_2015_pred_median"] - helper_df["Cmic_2015_pred_median"])
-    helper_df["y2018_Cm"] = helper_df["BD 0-20_2018_pred_median"] * helper_df["OC_sc_g_kg_2018_pred_median"]
-    helper_df["y2018_Cb"] = helper_df["BD 0-20_2018_pred_median"] * helper_df["Cmic_2018_pred_median"]
-    helper_df["y2018_Cp"] = helper_df["BD 0-20_2018_pred_median"] * (helper_df["OC_2018"] - helper_df["OC_sc_g_kg_2018_pred_median"] - helper_df["Cmic_2018_pred_median"])
+    helper_df["y2015_Cm"] = helper_df["pred_BD_median_LinReg_inf_BD_0-20_2015"] * helper_df["pred_MAOC_median_LinReg_inf_OC_sc_g_kg_2015"]
+    helper_df["y2015_Cb"] = helper_df["pred_BD_median_LinReg_inf_BD_0-20_2015"] * helper_df["pred_MIC_median_LinReg_inf_Cmic_2015"]
+    helper_df["y2015_Cp"] = helper_df["pred_BD_median_LinReg_inf_BD_0-20_2015"] * (helper_df["OC_2015"] - helper_df["pred_MAOC_median_LinReg_inf_OC_sc_g_kg_2015"] - helper_df["pred_MIC_median_LinReg_inf_Cmic_2015"])
+    helper_df["y2018_Cm"] = helper_df["pred_BD_median_LinReg_inf_BD_0-20_2018"] * helper_df["pred_MAOC_median_LinReg_inf_OC_sc_g_kg_2018"]
+    helper_df["y2018_Cb"] = helper_df["pred_BD_median_LinReg_inf_BD_0-20_2018"] * helper_df["pred_MIC_median_LinReg_inf_Cmic_2018"]
+    helper_df["y2018_Cp"] = helper_df["pred_BD_median_LinReg_inf_BD_0-20_2018"] * (helper_df["OC_2018"] - helper_df["pred_MAOC_median_LinReg_inf_OC_sc_g_kg_2018"] - helper_df["pred_MIC_median_LinReg_inf_Cmic_2018"])
     return helper_df
 
 def main():
