@@ -34,6 +34,27 @@ def normalize_targets(y, target_mean, target_std):
     return (y - target_mean) / target_std
 
 
+def pools_to_loss_targets(y_cmp, y0, use_dynamic, targets_arg):
+    """Map mechanistic (Cp,Cb,Cm) deltas or levels to loss/R² targets: SOC sum and optional MAOC/MIC fractions."""
+    soc_sum = jnp.sum(y_cmp, axis=-1, keepdims=True)
+    if targets_arg == "SOC":
+        return soc_sum
+    if use_dynamic:
+        y_fin = y_cmp + y0
+    else:
+        y_fin = y_cmp
+    soc_lvl = jnp.sum(y_fin, axis=-1, keepdims=True) + 1e-12
+    mic_r = y_fin[:, 1:2] / soc_lvl
+    maoc_r = y_fin[:, 2:3] / soc_lvl
+    if targets_arg == "SOC,MICi":
+        return jnp.concatenate([soc_sum, mic_r], axis=-1)
+    if targets_arg == "SOC,MAOCi":
+        return jnp.concatenate([soc_sum, maoc_r], axis=-1)
+    if targets_arg == "SOC,MAOCi,MICi":
+        return jnp.concatenate([soc_sum, maoc_r, mic_r], axis=-1)
+    raise KeyError(targets_arg)
+
+
 def build_param_matrix(
     net_params,
     global_raw,
@@ -68,6 +89,7 @@ def eval_components(
     batched_steady,
     target_mean,
     target_std,
+    targets_arg,
     ):
     p_pred = build_param_matrix(
         params["net"],
@@ -83,7 +105,8 @@ def eval_components(
         y_pred_compare = y_pred - y0_batch
     else:
         y_pred_compare = batched_steady(p_pred)
-    y_pred_norm = normalize_targets(y_pred_compare, target_mean, target_std)
+    y_pred_derived = pools_to_loss_targets(y_pred_compare, y0_batch, use_dynamic, targets_arg)
+    y_pred_norm = normalize_targets(y_pred_derived, target_mean, target_std)
     y_target_norm = normalize_targets(y_target, target_mean, target_std)
     diff = y_pred_norm - y_target_norm
     delta = 0.5
@@ -108,6 +131,7 @@ def eval_loss(
     batched_steady,
     target_mean,
     target_std,
+    targets_arg,
     ):
     per_component = eval_components(
         params,
@@ -123,6 +147,7 @@ def eval_loss(
         batched_steady=batched_steady,
         target_mean=target_mean,
         target_std=target_std,
+        targets_arg=targets_arg,
     )
     weights = weights / (jnp.sum(weights) + 1e-8)
     loss = jnp.sum(per_component * weights)
@@ -160,6 +185,7 @@ def eval_r2(
     use_dynamic,
     batched_sim,
     batched_steady,
+    targets_arg,
 ):
     p_pred = build_param_matrix(
         params["net"],
@@ -175,12 +201,13 @@ def eval_r2(
         y_pred_compare = y_pred - y0_batch
     else:
         y_pred_compare = batched_steady(p_pred)
-    ss_res = jnp.sum((y_target - y_pred_compare) ** 2, axis=0)
+    y_pred_derived = pools_to_loss_targets(y_pred_compare, y0_batch, use_dynamic, targets_arg)
+    ss_res = jnp.sum((y_target - y_pred_derived) ** 2, axis=0)
     ss_tot = jnp.sum((y_target - jnp.mean(y_target, axis=0)) ** 2, axis=0)
     return 1.0 - ss_res / (ss_tot + 1e-12)
 
 
-@partial(jax.jit, static_argnames=("use_dynamic", "batched_sim", "batched_steady"))
+@partial(jax.jit, static_argnames=("use_dynamic", "batched_sim", "batched_steady", "targets_arg"))
 def train_step(
     params,
     opt_state,
@@ -200,6 +227,7 @@ def train_step(
     batched_steady,
     target_mean,
     target_std,
+    targets_arg,
 ):
     (loss, per_component), grads = jax.value_and_grad(eval_loss, has_aux=True)(
         params,
@@ -216,6 +244,7 @@ def train_step(
         batched_steady=batched_steady,
         target_mean=target_mean,
         target_std=target_std,
+        targets_arg=targets_arg,
     )
     weight_decay = 1e-4
     loss = loss + weight_decay * l2_norm(params)

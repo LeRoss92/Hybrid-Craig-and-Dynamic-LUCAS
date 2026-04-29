@@ -7,12 +7,6 @@ pred_groups = {
         2018: ['HALA_2018gps_topsoil'],
     },
     'Ox. ex. Al/Fe': ['Ox_Al_2018', 'Ox_Fe_2018'],
-    'MODIS NPP 20xx-2a': {
-        2009: [f'MODIS_NPP_2009gps_{y}' for y in [2007, 2008, 2009]],
-        2015: [f'MODIS_NPP_2015gps_{y}' for y in [2013, 2014, 2015]],
-        2018: [f'MODIS_NPP_2018gps_{y}' for y in [2016, 2017, 2018]],
-    },
-    'MODIS NPP 09-18': [f'MODIS_NPP_2015gps_{y}' for y in range(2009, 2019)],
     'AlphaEarth 2017+2018': {
         2009: [f'AE{str(i).zfill(2)}_2009gps_2017' for i in range(64)] + [f'AE{str(i).zfill(2)}_2009gps_2018' for i in range(64)],
         2015: [f'AE{str(i).zfill(2)}_2015gps_2017' for i in range(64)] + [f'AE{str(i).zfill(2)}_2015gps_2018' for i in range(64)],
@@ -46,197 +40,175 @@ pred_groups = {
         2015: ['doy_2015'],
         2018: ['doy_2018'],
     },
+    'doy change': ["doy_linreg_slope"],
+    'doy avg': ["doy_avg_09_15_18"],
+    'Fluxcom_era5l': {
+        2009: ['Fluxcom_H_2009-5_mean',
+                'Fluxcom_LE_2009-5_mean', 
+                'era5_land_t2m_2009-5_mean', 
+                'era5_land_tp_2009-5_mean', 
+                'era5_land_hpet_2009-5_mean', 
+                'MODIS_NPP_2009-5_mean'],
+        2015: ['Fluxcom_H_2009-5_mean',
+                'Fluxcom_LE_2009-5_mean', 
+                'era5_land_t2m_2009-5_mean', 
+                'era5_land_tp_2009-5_mean', 
+                'era5_land_hpet_2009-5_mean', 
+                'MODIS_NPP_2015-5_mean'],
+        2018: ['Fluxcom_H_2009-5_mean',
+                'Fluxcom_LE_2009-5_mean', 
+                'era5_land_t2m_2009-5_mean', 
+                'era5_land_tp_2009-5_mean', 
+                'era5_land_hpet_2009-5_mean', 
+                'MODIS_NPP_2009-5_mean'],
+    },
+    'Fluxcom_era5l change': [x + '_linreg_slope' for x in ['Fluxcom_H', 'Fluxcom_LE', 'era5_land_t2m', 'era5_land_tp', 'era5_land_hpet', 'MODIS_NPP']],
+    'Fluxcom_era5l avg': [x + '_avg_09_15_18' for x in ['Fluxcom_H', 'Fluxcom_LE', 'era5_land_t2m', 'era5_land_tp', 'era5_land_hpet', 'MODIS_NPP']],
+    'input': {
+        2009: ['Fluxcom_H_2009-5_mean'
+                'Fluxcom_LE_2009-5_mean', 
+                'era5_land_t2m_2009-5_mean', 
+                'era5_land_tp_2009-5_mean', 
+                'era5_land_hpet_2009-5_mean'],
+        2015: ['Fluxcom_H_2009-5_mean'
+                'Fluxcom_LE_2009-5_mean', 
+                'era5_land_t2m_2009-5_mean', 
+                'era5_land_tp_2009-5_mean', 
+                'era5_land_hpet_2009-5_mean'],
+        2018: ['Fluxcom_H_2009-5_mean'
+                'Fluxcom_LE_2009-5_mean', 
+                'era5_land_t2m_2009-5_mean', 
+                'era5_land_tp_2009-5_mean', 
+                'era5_land_hpet_2009-5_mean'],
+    },
 }
 
 # Single dict: targets at first level. Per target: predictors, log_predictors, categoricals, inference.
 # inference = list of {target_name, predictors, log_predictors, categoricals} - each item is a full pred_config
 TARGET_CONFIG = {
-    "BD": {
-        "target_name": "BD 0-20_2018",
-        "target_log": False,
-        "predictors": (
-            pred_groups['Texture']
-            + pred_groups['Mineral Activity'][2018]
-            + pred_groups['Ox. ex. Al/Fe']
-            + pred_groups['LUCAS normal'][2018]
-            + pred_groups['MODIS NPP 20xx-2a'][2018]
-            + pred_groups['WorldClim'][2018]
-            + pred_groups['AlphaEarth 2017+2018'][2018]
-            + pred_groups['doy'][2018]
-        ),
-        "log_predictors": pred_groups['OC (log)'][2018] + pred_groups['LUCAS log'][2018],
-        "categoricals": [],#'Soil_Group', 'lc1_2_2018', 'lc1_2018'],
-        "inference": [
-            {
-                "target_name": "BD 0-20_2015",
-                "predictors": (
-                    pred_groups['Texture']
-                    + pred_groups['Mineral Activity'][2015]
-                    + pred_groups['Ox. ex. Al/Fe']
-                    + pred_groups['LUCAS normal'][2015]
-                    + pred_groups['MODIS NPP 20xx-2a'][2015]
-                    + pred_groups['WorldClim'][2015]
-                    + pred_groups['AlphaEarth 2017+2018'][2015]
-                    + pred_groups['doy'][2015]
-                ),
-                "log_predictors": pred_groups['OC (log)'][2015] + pred_groups['LUCAS log'][2015],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2015', 'lc1_2015'],
-            },
-            {
-                "target_name": "BD 0-20_2018",
-                "predictors": (
-                    pred_groups['Texture']
-                    + pred_groups['Mineral Activity'][2018]
-                    + pred_groups['Ox. ex. Al/Fe']
-                    + pred_groups['LUCAS normal'][2018]
-                    + pred_groups['MODIS NPP 20xx-2a'][2018]
-                    + pred_groups['WorldClim'][2018]
-                    + pred_groups['AlphaEarth 2017+2018'][2018]
-                    + pred_groups['doy'][2018]
-                ),
-                "log_predictors": pred_groups['OC (log)'][2018] + pred_groups['LUCAS log'][2018],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2018', 'lc1_2018'],
-            },
-            {
-                "target_name": "BD 0-20_2009",
-                "predictors": (
-                    pred_groups['Texture']
-                    + pred_groups['Mineral Activity'][2009]
-                    + pred_groups['Ox. ex. Al/Fe']
-                    + pred_groups['LUCAS normal'][2009]
-                    + pred_groups['MODIS NPP 20xx-2a'][2009]
-                    + pred_groups['WorldClim'][2009]
-                    + pred_groups['AlphaEarth 2017+2018'][2009]
-                    + pred_groups['doy'][2009]
-                ),
-                "log_predictors": pred_groups['OC (log)'][2009] + pred_groups['LUCAS log'][2009],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2009', 'lc1_2009'],
-            },
-        ],
-    },
     "MAOC": {
-        "target_name": "OC_sc_g_kg_2009",
+        "target_name": "MAOC_index_2009",
         "target_log": False,
         "predictors": (
             pred_groups['Texture']
             + pred_groups['Mineral Activity'][2009]
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['LUCAS normal'][2009]
-            + pred_groups['MODIS NPP 20xx-2a'][2009]
-            + pred_groups['WorldClim'][2009]
-            + pred_groups['AlphaEarth 2017+2018'][2009]
+            + pred_groups['Fluxcom_era5l'][2009]
+            # + pred_groups['WorldClim'][2009]
+            # + pred_groups['AlphaEarth 2017+2018'][2009]
             + pred_groups['doy'][2009]
         ),
         "log_predictors": pred_groups['OC (log)'][2009] + pred_groups['LUCAS log'][2009],
-        "categoricals": [],#'Soil_Group', 'lc1_2_2009', 'lc1_2009'],
+        "categoricals": ['lc1_2_2009'], # , 'lc1_2009' 'Soil_Group', 
         "inference": [
             {
-                "target_name": "OC_sc_g_kg_2015",
+                "target_name": "MAOC_index_2015",
                 "predictors": (
                     pred_groups['Texture']
                     + pred_groups['Mineral Activity'][2015]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2015]
-                    + pred_groups['MODIS NPP 20xx-2a'][2015]
-                    + pred_groups['WorldClim'][2015]
-                    + pred_groups['AlphaEarth 2017+2018'][2015]
+                    + pred_groups['Fluxcom_era5l'][2015]
+                    # + pred_groups['WorldClim'][2015]
+                    # + pred_groups['AlphaEarth 2017+2018'][2015]
                     + pred_groups['doy'][2015]
                 ),
                 "log_predictors": pred_groups['OC (log)'][2015] + pred_groups['LUCAS log'][2015],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2015', 'lc1_2015']
+                "categoricals": ['lc1_2_2015'] # , 'lc1_2015' 'Soil_Group', 
             },
             {
-                "target_name": "OC_sc_g_kg_2018",
+                "target_name": "MAOC_index_2018",
                 "predictors": (
                     pred_groups['Texture']
                     + pred_groups['Mineral Activity'][2018]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2018]
-                    + pred_groups['MODIS NPP 20xx-2a'][2018]
-                    + pred_groups['WorldClim'][2018]
-                    + pred_groups['AlphaEarth 2017+2018'][2018]
+                    + pred_groups['Fluxcom_era5l'][2018]
+                    # + pred_groups['WorldClim'][2018]
+                    # + pred_groups['AlphaEarth 2017+2018'][2018]
                     + pred_groups['doy'][2018]
                 ),
                 "log_predictors": pred_groups['OC (log)'][2018] + pred_groups['LUCAS log'][2018],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2018', 'lc1_2018']
+                "categoricals": ['lc1_2_2018'] # , 'lc1_2018' 'Soil_Group', 
             },
             {
-                "target_name": "OC_sc_g_kg_2009",
+                "target_name": "MAOC_index_2009",
                 "predictors": (
                     pred_groups['Texture']
                     + pred_groups['Mineral Activity'][2009]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2009]
-                    + pred_groups['MODIS NPP 20xx-2a'][2009]
-                    + pred_groups['WorldClim'][2009]
-                    + pred_groups['AlphaEarth 2017+2018'][2009]
+                    + pred_groups['Fluxcom_era5l'][2009]
+                    # + pred_groups['WorldClim'][2009]
+                    # + pred_groups['AlphaEarth 2017+2018'][2009]
                     + pred_groups['doy'][2009]
                 ),
                 "log_predictors": pred_groups['OC (log)'][2009] + pred_groups['LUCAS log'][2009],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2009', 'lc1_2009'],
+                "categoricals": ['lc1_2_2009'], # , 'lc1_2009' 'Soil_Group', 
             },
         ],
     },
     "MIC": {
-        "target_name": "Cmic_2018",
+        "target_name": "Cmic_index_2018",
         "target_log": False,
         "predictors": (
             pred_groups['Texture']
             + pred_groups['Mineral Activity'][2018]
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['LUCAS normal'][2018]
-            + pred_groups['MODIS NPP 20xx-2a'][2018]
-            + pred_groups['WorldClim'][2018]
-            + pred_groups['AlphaEarth 2017+2018'][2018]
+            + pred_groups['Fluxcom_era5l'][2018]
+            # + pred_groups['WorldClim'][2018]
+            # + pred_groups['AlphaEarth 2017+2018'][2018]
             + pred_groups['doy'][2018]
         ),
         "log_predictors": pred_groups['OC (log)'][2018] + pred_groups['LUCAS log'][2018],
-        "categoricals": [],#'Soil_Group', 'lc1_2_2018', 'lc1_2018'],
+        "categoricals": ['lc1_2_2018'], # , 'lc1_2018' 'Soil_Group', 
         "inference": [
             {
-                "target_name": "Cmic_2015",
+                "target_name": "Cmic_index_2015",
                 "predictors": (
                     pred_groups['Texture']
                     + pred_groups['Mineral Activity'][2015]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2015]
-                    + pred_groups['MODIS NPP 20xx-2a'][2015]
-                    + pred_groups['WorldClim'][2015]
-                    + pred_groups['AlphaEarth 2017+2018'][2015]
+                    + pred_groups['Fluxcom_era5l'][2015]
+                    # + pred_groups['WorldClim'][2015]
+                    # + pred_groups['AlphaEarth 2017+2018'][2015]
                     + pred_groups['doy'][2015]
                 ),
                 "log_predictors": pred_groups['OC (log)'][2015] + pred_groups['LUCAS log'][2015],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2015', 'lc1_2015']
+                "categoricals": ['lc1_2_2015'] # , 'lc1_2015' 'Soil_Group', 
             },
             {
-                "target_name": "Cmic_2018",
+                "target_name": "Cmic_index_2018",
                 "predictors": (
                     pred_groups['Texture']
                     + pred_groups['Mineral Activity'][2018]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2018]
-                    + pred_groups['MODIS NPP 20xx-2a'][2018]
-                    + pred_groups['WorldClim'][2018]
-                    + pred_groups['AlphaEarth 2017+2018'][2018]
+                    + pred_groups['Fluxcom_era5l'][2018]
+                    # + pred_groups['WorldClim'][2018]
+                    # + pred_groups['AlphaEarth 2017+2018'][2018]
                     + pred_groups['doy'][2018]
                 ),
                 "log_predictors": pred_groups['OC (log)'][2018] + pred_groups['LUCAS log'][2018],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2018', 'lc1_2018'],
+                "categoricals": ['lc1_2_2018'], #, 'lc1_2018' 'Soil_Group', 
             },
             {
-                "target_name": "Cmic_2009",
+                "target_name": "Cmic_index_2009",
                 "predictors": (
                     pred_groups['Texture']
                     + pred_groups['Mineral Activity'][2009]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2009]
-                    + pred_groups['MODIS NPP 20xx-2a'][2009]
-                    + pred_groups['WorldClim'][2009]
-                    + pred_groups['AlphaEarth 2017+2018'][2009]
+                    + pred_groups['Fluxcom_era5l'][2009]
+                    # + pred_groups['WorldClim'][2009]
+                    # + pred_groups['AlphaEarth 2017+2018'][2009]
                     + pred_groups['doy'][2009]
                 ),
                 "log_predictors": pred_groups['OC (log)'][2009] + pred_groups['LUCAS log'][2009],
-                "categoricals": [],#'Soil_Group', 'lc1_2_2009', 'lc1_2009'],
+                "categoricals": ['lc1_2_2009'], #, 'lc1_2009' 'Soil_Group', 
             },
         ],
     },
@@ -248,13 +220,13 @@ TARGET_CONFIG = {
             + pred_groups['Mineral Activity'][2009]
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['LUCAS normal'][2009]
-            + pred_groups['MODIS NPP 20xx-2a'][2009]
-            + pred_groups['WorldClim'][2009]
-            + pred_groups['AlphaEarth 2017+2018'][2009]
+            + pred_groups['Fluxcom_era5l'][2009]
+            # + pred_groups['WorldClim'][2009]
+            # + pred_groups['AlphaEarth 2017+2018'][2009]
             + pred_groups['doy'][2009]
         ),
         "log_predictors": pred_groups['LUCAS log'][2009],
-        "categoricals": ['Soil_Group', 'lc1_2_2009', 'lc1_2009'],
+        "categoricals": ['lc1_2_2009'], # 'Soil_Group', , 'lc1_2009'
         "inference": [
             {
                 "target_name": "OC_2009",
@@ -263,13 +235,13 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2009]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2009]
-                    + pred_groups['MODIS NPP 20xx-2a'][2009]
-                    + pred_groups['WorldClim'][2009]
-                    + pred_groups['AlphaEarth 2017+2018'][2009]
+                    + pred_groups['Fluxcom_era5l'][2009]
+                    # + pred_groups['WorldClim'][2009]
+                    # + pred_groups['AlphaEarth 2017+2018'][2009]
                     + pred_groups['doy'][2009]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2009],
-                "categoricals": ['Soil_Group', 'lc1_2_2009', 'lc1_2009'],
+                "categoricals": ['lc1_2_2009'], # 'Soil_Group', , 'lc1_2009'
             },
             {
                 "target_name": "OC_2015",
@@ -278,13 +250,13 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2015]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2015]
-                    + pred_groups['MODIS NPP 20xx-2a'][2015]
-                    + pred_groups['WorldClim'][2015]
-                    + pred_groups['AlphaEarth 2017+2018'][2015]
+                    + pred_groups['Fluxcom_era5l'][2015]
+                    # + pred_groups['WorldClim'][2015]
+                    # + pred_groups['AlphaEarth 2017+2018'][2015]
                     + pred_groups['doy'][2015]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2015],
-                "categoricals": ['Soil_Group', 'lc1_2_2015', 'lc1_2015'],
+                "categoricals": ['lc1_2_2015'], # 'Soil_Group', , 'lc1_2015'
             },
             {
                 "target_name": "OC_2018",
@@ -293,13 +265,13 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2018]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2018]
-                    + pred_groups['MODIS NPP 20xx-2a'][2018]
-                    + pred_groups['WorldClim'][2018]
-                    + pred_groups['AlphaEarth 2017+2018'][2018]
+                    + pred_groups['Fluxcom_era5l'][2018]
+                    # + pred_groups['WorldClim'][2018]
+                    # + pred_groups['AlphaEarth 2017+2018'][2018]
                     + pred_groups['doy'][2018]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2018],
-                "categoricals": ['Soil_Group', 'lc1_2_2018', 'lc1_2018'],
+                "categoricals": ['lc1_2_2018'], # 'Soil_Group', , 'lc1_2018'
             },
         ],
     },
@@ -311,13 +283,13 @@ TARGET_CONFIG = {
             + pred_groups['Mineral Activity'][2015]
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['LUCAS normal'][2015]
-            + pred_groups['MODIS NPP 20xx-2a'][2015]
-            + pred_groups['WorldClim'][2015]
-            + pred_groups['AlphaEarth 2017+2018'][2015]
+            + pred_groups['Fluxcom_era5l'][2015]
+            # + pred_groups['WorldClim'][2015]
+            # + pred_groups['AlphaEarth 2017+2018'][2015]
             + pred_groups['doy'][2015]
         ),
         "log_predictors": pred_groups['LUCAS log'][2015],
-        "categoricals": ['Soil_Group', 'lc1_2_2015', 'lc1_2015'],
+        "categoricals": ['lc1_2_2015'], # 'Soil_Group', , 'lc1_2015'
         "inference": [
             {
                 "target_name": "OC_2009",
@@ -326,13 +298,13 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2009]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2009]
-                    + pred_groups['MODIS NPP 20xx-2a'][2009]
-                    + pred_groups['WorldClim'][2009]
-                    + pred_groups['AlphaEarth 2017+2018'][2009]
+                    + pred_groups['Fluxcom_era5l'][2009]
+                    # + pred_groups['WorldClim'][2009]
+                    # + pred_groups['AlphaEarth 2017+2018'][2009]
                     + pred_groups['doy'][2009]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2009],
-                "categoricals": ['Soil_Group', 'lc1_2_2009', 'lc1_2009'],
+                "categoricals": ['lc1_2_2009'], # 'Soil_Group', , 'lc1_2009'
             },
             {
                 "target_name": "OC_2015",
@@ -341,13 +313,13 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2015]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2015]
-                    + pred_groups['MODIS NPP 20xx-2a'][2015]
-                    + pred_groups['WorldClim'][2015]
-                    + pred_groups['AlphaEarth 2017+2018'][2015]
+                    + pred_groups['Fluxcom_era5l'][2015]
+                    # + pred_groups['WorldClim'][2015]
+                    # + pred_groups['AlphaEarth 2017+2018'][2015]
                     + pred_groups['doy'][2015]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2015],
-                "categoricals": ['Soil_Group', 'lc1_2_2015', 'lc1_2015'],
+                "categoricals": ['lc1_2_2015'], # 'Soil_Group', , 'lc1_2015'
             },
             {
                 "target_name": "OC_2018",
@@ -356,13 +328,13 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2018]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2018]
-                    + pred_groups['MODIS NPP 20xx-2a'][2018]
-                    + pred_groups['WorldClim'][2018]
-                    + pred_groups['AlphaEarth 2017+2018'][2018]
+                    + pred_groups['Fluxcom_era5l'][2018]
+                    # + pred_groups['WorldClim'][2018]
+                    # + pred_groups['AlphaEarth 2017+2018'][2018]
                     + pred_groups['doy'][2018]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2018],
-                "categoricals": ['Soil_Group', 'lc1_2_2018', 'lc1_2018'],
+                "categoricals": ['lc1_2_2018'], # 'Soil_Group', , 'lc1_2018'
             },
         ],
     },
@@ -374,13 +346,13 @@ TARGET_CONFIG = {
             + pred_groups['Mineral Activity'][2018]
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['LUCAS normal'][2018]
-            + pred_groups['MODIS NPP 20xx-2a'][2018]
-            + pred_groups['WorldClim'][2018]
-            + pred_groups['AlphaEarth 2017+2018'][2018]
+            + pred_groups['Fluxcom_era5l'][2018]
+            # + pred_groups['WorldClim'][2018]
+            # + pred_groups['AlphaEarth 2017+2018'][2018]
             + pred_groups['doy'][2018]
         ),
         "log_predictors": pred_groups['LUCAS log'][2018],
-        "categoricals": ['Soil_Group', 'lc1_2_2018', 'lc1_2018'],
+        "categoricals": ['lc1_2_2018'], # 'Soil_Group', , 'lc1_2018'
         "inference": [
             {
                 "target_name": "OC_2009",
@@ -389,13 +361,13 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2009]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2009]
-                    + pred_groups['MODIS NPP 20xx-2a'][2009]
-                    + pred_groups['WorldClim'][2009]
-                    + pred_groups['AlphaEarth 2017+2018'][2009]
+                    + pred_groups['Fluxcom_era5l'][2009]
+                    # + pred_groups['WorldClim'][2009]
+                    # + pred_groups['AlphaEarth 2017+2018'][2009]
                     + pred_groups['doy'][2009]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2009],
-                "categoricals": ['Soil_Group', 'lc1_2_2009', 'lc1_2009'],
+                "categoricals": ['lc1_2_2009'], # 'Soil_Group', , 'lc1_2009'
             },
             {
                 "target_name": "OC_2015",
@@ -404,13 +376,13 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2015]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2015]
-                    + pred_groups['MODIS NPP 20xx-2a'][2015]
-                    + pred_groups['WorldClim'][2015]
-                    + pred_groups['AlphaEarth 2017+2018'][2015]
+                    + pred_groups['Fluxcom_era5l'][2015]
+                    # + pred_groups['WorldClim'][2015]
+                    # + pred_groups['AlphaEarth 2017+2018'][2015]
                     + pred_groups['doy'][2015]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2015],
-                "categoricals": ['Soil_Group', 'lc1_2_2015', 'lc1_2015'],
+                "categoricals": ['lc1_2_2015'], # 'Soil_Group', , 'lc1_2015'
             },
             {
                 "target_name": "OC_2018",
@@ -419,36 +391,14 @@ TARGET_CONFIG = {
                     + pred_groups['Mineral Activity'][2018]
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2018]
-                    + pred_groups['MODIS NPP 20xx-2a'][2018]
-                    + pred_groups['WorldClim'][2018]
-                    + pred_groups['AlphaEarth 2017+2018'][2018]
+                    + pred_groups['Fluxcom_era5l'][2018]
+                    # + pred_groups['WorldClim'][2018]
+                    # + pred_groups['AlphaEarth 2017+2018'][2018]
                     + pred_groups['doy'][2018]
                 ),
                 "log_predictors": pred_groups['LUCAS log'][2018],
-                "categoricals": ['Soil_Group', 'lc1_2_2018', 'lc1_2018'],
+                "categoricals": ['lc1_2_2018'], # 'Soil_Group', , 'lc1_2018'
             },
-        ],
-    },
-    "dSOC_15_18": {
-        "target_name": "dOC_15_18",
-        "target_log": False,
-        "predictors": (
-            pred_groups['Texture']
-            + pred_groups['Mineral Activity'][2015]
-            + pred_groups['Ox. ex. Al/Fe']
-            + pred_groups['LUCAS normal'][2015]
-            + pred_groups['LUCAS normal'][2018]  # only pH associated
-            + pred_groups['MODIS NPP 20xx-2a'][2015]
-            + pred_groups['MODIS NPP 20xx-2a'][2018]
-            + pred_groups['WorldClim'][2015]
-            + pred_groups['AlphaEarth 2017+2018'][2015]
-            + pred_groups['doy'][2015]
-            + pred_groups['doy'][2018]
-        ),
-        "log_predictors": pred_groups['OC (log)'][2015] + pred_groups['LUCAS log'][2015],
-        "categoricals": ['Soil_Group', 'lc1_2015', 'lc1_2018', 'lc1_2_2015', 'lc1_2_2018', 'change'],
-        "inference": [
-            {"target_name": "dOC_15_18"},  # same as training: no predictors/log_predictors override
         ],
     },
     "dSOC_09_18": {
@@ -459,15 +409,15 @@ TARGET_CONFIG = {
             + pred_groups['Mineral Activity'][2015]
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['LUCAS normal avg']
-            + pred_groups['MODIS NPP 09-18']
-            + pred_groups['WorldClim'][2015]
-            + pred_groups['AlphaEarth 2017+2018'][2015]
-            + pred_groups['doy'][2009]
-            + pred_groups['doy'][2015]
-            + pred_groups['doy'][2018]
+            + pred_groups['Fluxcom_era5l change']
+            + pred_groups['Fluxcom_era5l avg']
+            # + pred_groups['WorldClim'][2015]
+            # + pred_groups['AlphaEarth 2017+2018'][2015]
+            + pred_groups['doy change']
+            + pred_groups['doy avg']
         ),
         "log_predictors": pred_groups['OC (log) avg'] + pred_groups['LUCAS log avg'],
-        "categoricals": ['Soil_Group', 'LC_change_09_15_18'], 
+        "categoricals": ['LC_change_09_15_18'], # 'Soil_Group', 
         "inference": [
             {"target_name": "SOC_linreg_slope"},  # same as training: no predictors/log_predictors override
         ],
@@ -475,10 +425,10 @@ TARGET_CONFIG = {
 }
 
 use_model = {
-    'BD': 'LinReg',
+    # 'BD': 'LinReg',
     'MAOC': 'LinReg',
     'MIC': 'LinReg',
-    'dSOC_15_18': 'XGB',
+    # 'dSOC_15_18': 'XGB',
     'dSOC_09_18': 'XGB',
     'SOC09': 'XGB',
     'SOC15': 'XGB',
@@ -491,7 +441,6 @@ TRAIN_DEFAULTS = {
     'max_features': 20,
     'n_folds_HP_opt': 3, 
     'n_jobs_folds': 8,
-    'vars_order': ['BD', 'MAOC', 'MIC', 'dSOC_15_18', 'dSOC_09_18', 'SOC09', 'SOC18', 'SOC15'],
     'N_JOBS': 70
 }
 
@@ -500,7 +449,7 @@ predictors_dynamic = (
     pred_groups['Texture'] 
     + pred_groups['Ox. ex. Al/Fe']
     + pred_groups['Mineral Activity'][2015] 
-    + pred_groups['MODIS NPP 20xx-2a'][2015]
+    # + pred_groups['MODIS NPP 20xx-2a'][2015]
     + pred_groups['WorldClim'][2015] 
     + pred_groups['LUCAS normal'][2015]
     + pred_groups['AlphaEarth 2017+2018'][2015] 
@@ -510,7 +459,7 @@ predictors_2015 = (
     pred_groups['Texture'] 
     + pred_groups['Ox. ex. Al/Fe']
     + pred_groups['Mineral Activity'][2015] 
-    + pred_groups['MODIS NPP 20xx-2a'][2015]
+    # + pred_groups['MODIS NPP 20xx-2a'][2015]
     + pred_groups['WorldClim'][2015] 
     + pred_groups['LUCAS normal'][2015]
     + pred_groups['AlphaEarth 2017+2018'][2015] 
@@ -520,7 +469,7 @@ predictors_2018 = (
     pred_groups['Texture'] 
     + pred_groups['Ox. ex. Al/Fe']
     + pred_groups['Mineral Activity'][2018] 
-    + pred_groups['MODIS NPP 20xx-2a'][2018]
+    # + pred_groups['MODIS NPP 20xx-2a'][2018]
     + pred_groups['WorldClim'][2018] 
     + pred_groups['LUCAS normal'][2018]
     + pred_groups['AlphaEarth 2017+2018'][2018] 
@@ -528,7 +477,8 @@ predictors_2018 = (
 )
 log_cols = pred_groups['LUCAS log'][2015] + pred_groups['LUCAS log'][2018]
 
-BD = 1.3  # g cm^-3 (bulk density, used for unit conversions)
+# BD = 1.3  # g cm^-3 (bulk density, used for unit conversions)
+BD = 1.0  # g cm^-3 (bulk density, used for unit conversions) -> now contents instead of stock modeled
 
 default_param_ranges = {
     "I": {

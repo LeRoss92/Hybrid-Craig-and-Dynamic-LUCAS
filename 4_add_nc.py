@@ -11,14 +11,14 @@ links = [
     {
         'name': "BNPP",
         'subs': ['0-20', '20-40', '40-60', '60-80', '80-100', '100-150', '150-200', '0-200'],
-        'links': ['/User/homes/leorossd/people/HPLG/examples/021_data_4/original_files/BNPP/BNPP_0-20cm.tif',
-                  '/User/homes/leorossd/people/HPLG/examples/021_data_4/original_files/BNPP/BNPP_20-40cm.tif',
-                  '/User/homes/leorossd/people/HPLG/examples/021_data_4/original_files/BNPP/BNPP_40-60cm.tif',
-                  '/User/homes/leorossd/people/HPLG/examples/021_data_4/original_files/BNPP/BNPP_60-80cm.tif',
-                  '/User/homes/leorossd/people/HPLG/examples/021_data_4/original_files/BNPP/BNPP_80-100cm.tif',
-                  '/User/homes/leorossd/people/HPLG/examples/021_data_4/original_files/BNPP/BNPP_100-150cm.tif',
-                  '/User/homes/leorossd/people/HPLG/examples/021_data_4/original_files/BNPP/BNPP_150-200cm.tif',
-                  '/User/homes/leorossd/people/HPLG/examples/021_data_4/original_files/BNPP/BNPP_0-200cm.tif'
+        'links': ['original_files/BNPP/BNPP_0-20cm.tif',
+                  'original_files/BNPP/BNPP_20-40cm.tif',
+                  'original_files/BNPP/BNPP_40-60cm.tif',
+                  'original_files/BNPP/BNPP_60-80cm.tif',
+                  'original_files/BNPP/BNPP_80-100cm.tif',
+                  'original_files/BNPP/BNPP_100-150cm.tif',
+                  'original_files/BNPP/BNPP_150-200cm.tif',
+                  'original_files/BNPP/BNPP_0-200cm.tif'
                   ]
     },
     {
@@ -45,7 +45,8 @@ links = [
                     '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d00416_annual/MODIS/MOD17A3HGF.061/Data/Npp/Npp.org.86400.43200.2019.nc',
                     '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d00416_annual/MODIS/MOD17A3HGF.061/Data/Npp/Npp.org.86400.43200.2020.nc',
                     '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d00416_annual/MODIS/MOD17A3HGF.061/Data/Npp/Npp.org.86400.43200.2021.nc',
-                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d00416_annual/MODIS/MOD17A3HGF.061/Data/Npp/Npp.org.86400.43200.2022.nc']
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d00416_annual/MODIS/MOD17A3HGF.061/Data/Npp/Npp.org.86400.43200.2022.nc'
+                    ]
     },
     {
         'name': "BIOCLIM",
@@ -70,6 +71,117 @@ links = [
                 "/Net/Groups/BGI/scratch/leorossd/GridRefDB/data/gridded_products/nc_100x100_chunked/WorldClim_historical_climate/bioclimatic_30s/wc2.1_30s_bio_18.nc",
                 "/Net/Groups/BGI/scratch/leorossd/GridRefDB/data/gridded_products/nc_100x100_chunked/WorldClim_historical_climate/bioclimatic_30s/wc2.1_30s_bio_19.nc"
                 ]
+    },
+    {
+        'name': "Fluxcom_H",
+        'subs': [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018],
+        'links': ['/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2001.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2002.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2003.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2004.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2005.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2006.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2007.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2008.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2009.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2010.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2011.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2012.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2013.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2014.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2015.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2016.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2017.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/H/H.4320.2160.2018.nc'
+                    ]
+    },
+    {
+        'name': "Fluxcom_LE",
+        'subs': [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018],
+        'links': ['/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2001.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2002.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2003.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2004.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2005.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2006.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2007.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2008.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2009.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2010.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2011.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2012.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2013.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2014.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2015.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2016.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2017.nc',
+                    '/Net/Groups/BGI/data/DataStructureMDI/DATA/grid/Global/0d083_annual/Fluxcom/v1_RS_V006/Data/LE/LE.4320.2160.2018.nc',]
+    },
+    {
+        'name': "era5_land_hpet",
+        'subs': [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018],
+        'links': ['/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2001.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2002.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2003.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2004.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2005.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2006.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2007.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2008.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2009.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2010.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2011.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2012.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2013.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2014.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2015.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2016.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2017.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/hpet/hpet.annual.era5_land.2018.nc',]
+    },
+    {
+        'name': "era5_land_t2m",
+        'subs': [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018],
+        'links': ['/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2001.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2002.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2003.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2004.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2005.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2006.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2007.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2008.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2009.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2010.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2011.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2012.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2013.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2014.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2015.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2016.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2017.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/t2m/t2m.annual.era5_land.2018.nc',]
+    },
+    {
+        'name': "era5_land_tp",
+        'subs': [2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018],
+        'links': ['/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2001.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2002.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2003.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2004.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2005.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2006.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2007.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2008.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2009.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2010.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2011.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2012.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2013.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2014.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2015.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2016.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2017.nc',
+                    '/Net/Groups/data_BGC/era5_land/e1/0d10_annual/tp/tp.annual.era5_land.2018.nc',]
     }
 ]
 
@@ -139,8 +251,16 @@ def _extract_from_netcdf(nc_file_path, coordinates):
     latitudes = np.array([coord[0] for coord in coordinates])
     longitudes = np.array([coord[1] for coord in coordinates])
     values_at_coords = ds[any_band[0]].sel({lat_str: xr.DataArray(latitudes, dims='points'), lon_str: xr.DataArray(longitudes, dims='points')}, method='nearest')
-    npp_values = values_at_coords.compute()
-    return [float(value) for value in npp_values]
+    v = np.asarray(np.ma.filled(values_at_coords.compute().values, np.nan))
+    n = len(coordinates)
+    if v.ndim == 0:
+        v = np.array([float(v)])
+    elif v.shape != (n,):
+        i = next(j for j, s in enumerate(v.shape) if s == n)
+        v = np.moveaxis(v, i, 0).reshape(n, -1)[:, 0]
+    if v.size and not np.isfinite(v).any():
+        print(f"4_add_nc: only NaNs extracted - {nc_file_path}")
+    return [float(x) if np.isfinite(x) else np.nan for x in v]
 
 import pickle
 

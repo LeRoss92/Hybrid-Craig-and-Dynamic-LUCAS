@@ -22,7 +22,7 @@ import importlib.util
 
 from classic_models import get_models
 
-from config import get_onehot_cols_for_config
+# from config import get_onehot_cols_for_config
 
 
 def normalize_config(c):

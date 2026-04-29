@@ -15,10 +15,6 @@ from sklearn.base import clone
 from config import TARGET_CONFIG, TRAIN_DEFAULTS
 from classic_models import get_models
 models = get_models()
-MAX_FEATURES = TRAIN_DEFAULTS['max_features']
-MODEL_NAMES = TRAIN_DEFAULTS['models']
-vars_order = TRAIN_DEFAULTS['vars_order']
-N_JOBS = TRAIN_DEFAULTS['N_JOBS']
 with open("4_with_nc.pkl", "rb") as f:
     df = pickle.load(f)
 
@@ -91,6 +87,7 @@ def process_one_fold(var, fold, X_train, y_train, X_val, y_val, X_test, y_test,
     def to_signed_log(y): # log the abs value and give it sign: log of negative (changes) makes problems otherwise
         return np.sign(y) * np.log1p(np.abs(y))
     def from_signed_log(y_log): # function to revert (when prediction)
+        y_log = np.clip(y_log, -np.log(np.finfo(np.float64).max), np.log(np.finfo(np.float64).max))
         return np.sign(y_log) * np.expm1(np.abs(y_log))
 
     X_train = np.asarray(X_train, dtype=float, order='C').copy() # order='C' -> row major
@@ -108,7 +105,7 @@ def process_one_fold(var, fold, X_train, y_train, X_val, y_val, X_test, y_test,
     y_val_log = to_signed_log(y_val) # log val target (if negative special: vide function)
 
     fold_results = []
-    for model_name in MODEL_NAMES: # loop over methods (LR, PLR, XGB...)
+    for model_name in TRAIN_DEFAULTS['models']: # loop over methods (LR, PLR, XGB...)
         model_config = models[model_name] # get info on model
         param_grid = model_config.get('params', {}) or {} # create latin hypercube of hyperparameter combinations (if HP opt...)
         best_val_r2 = -np.inf # init best metric (worst R2 in -inf)
@@ -116,7 +113,7 @@ def process_one_fold(var, fold, X_train, y_train, X_val, y_val, X_test, y_test,
         for params_combo in ParameterGrid(param_grid) if param_grid else [{}]: # loop over hyperparameter combos
             try:
                 # Option 1: raw target
-                selected_raw = forward_select(X_train_p, X_val_p, y_train, y_val, model_config, params_combo, MAX_FEATURES) # select predictors with normal target: indices of selected returned
+                selected_raw = forward_select(X_train_p, X_val_p, y_train, y_val, model_config, params_combo, TRAIN_DEFAULTS['max_features']) # select predictors with normal target: indices of selected returned
                 m_raw = _make_model(model_config, params_combo, n_features=len(selected_raw)) # get the model (seems to make sense)
                 m_raw.fit(X_train_p[:, selected_raw], y_train) # fit the model to selected predictors (on train only)
                 pred_train_raw = m_raw.predict(X_train_p[:, selected_raw]) # predict train
@@ -126,7 +123,7 @@ def process_one_fold(var, fold, X_train, y_train, X_val, y_val, X_test, y_test,
                 train_r2_raw = r2_score(y_train, pred_train_raw) # calculate train R2
                 test_r2_raw = r2_score(y_test, pred_test_raw) # calculate test R2
                 # Option 2: log target -> do same with logged target
-                selected_log = forward_select(X_train_p, X_val_p, y_train_log, y_val_log, model_config, params_combo, MAX_FEATURES) # select predictors with logged target: indices of selected returned
+                selected_log = forward_select(X_train_p, X_val_p, y_train_log, y_val_log, model_config, params_combo, TRAIN_DEFAULTS['max_features']) # select predictors with logged target: indices of selected returned
                 m_log = _make_model(model_config, params_combo, n_features=len(selected_log))
                 m_log.fit(X_train_p[:, selected_log], y_train_log)
                 pred_train_log = from_signed_log(m_log.predict(X_train_p[:, selected_log]))
@@ -284,16 +281,15 @@ def _y_column_if_present(frame, col_name):
 
 ######################################## create parallel tasks ########################################
 tasks = []
-for var in vars_order:
+for var in TARGET_CONFIG.keys():
     config = TARGET_CONFIG[var] # info (targets, predictors, inference, log...)
     target_name = config["target_name"] # target name
     onehot_cols, _ = get_onehot_cols_for_config(df, config) # get data of 1-hot variables
     pred_cols = list(config['predictors']) + list(config['log_predictors']) + onehot_cols # all potential predictors together (1-hot might get selected individually)
     n_normal = len(config['predictors']) # number of normal distributed predictors
     n_log = len(config['log_predictors']) # numer of log normal distributed predictors
-    test_fit = df[(df['split'] == 'test') & (df[target_name].notna())] # labeled test (metrics)
-    X_test = test_fit[pred_cols].to_numpy(dtype=float) # get test X as array
-    y_test = test_fit[target_name].to_numpy(dtype=float) # get test y as array
+    test_data = df[(df['split'] == 'test') & (df[target_name].notna())] # valid test rows
+    X_test, y_test  = test_data[pred_cols].to_numpy(dtype=float), test_data[target_name].to_numpy(dtype=float) # get test X and y as array
     X_test[:, n_normal:n_normal + n_log] = np.log1p(X_test[:, n_normal:n_normal + n_log]) # log respective predictors (looks correct) 
     for fold in range(10): # loop over folds
         train_fit = df[(df['split'] != 'test') & (df['split'] != fold) & (df[target_name].notna())]
@@ -336,14 +332,11 @@ for var in vars_order:
                       X_train_all, X_val_all, X_test_all, y_train_all))
 
 ######################################## compute ########################################
-results = Parallel(n_jobs=N_JOBS, backend='loky')(delayed(process_one_fold)(*task) for task in tasks)
+results = Parallel(n_jobs=TRAIN_DEFAULTS['N_JOBS'], backend='loky')(delayed(process_one_fold)(*task) for task in tasks)
 
 ######################################## post processing ########################################
 # Each fold returns a list of dicts (one per model); flatten
 results_flat = [row for fold_results in results for row in fold_results]
-for r in results_flat:
-    print(f"var {r['var']} fold {r['fold']} {r['model']} train r2: {r['train r2']:.2f}, val r2: {r['val r2']:.2f}, test r2: {r['test r2']:.2f}, "
-          f"log_target={r['target_logged']}, predictors={r['selected_predictors']}")
 
 # One row per (var, fold, model): hyperparameters dict, log-target flag, ordered selected predictor names
 selection_meta_df = pd.DataFrame([
@@ -358,8 +351,6 @@ selection_meta_df = pd.DataFrame([
     }
     for r in results_flat
 ])
-# Full grid: len(vars_order) * n_folds * n_models rows (fewer if a model never converges)
-print(f"Selection metadata rows: {len(selection_meta_df)} (max {len(vars_order) * 10 * len(MODEL_NAMES)})")
 
 _results_exclude = (
     'pred_train', 'pred_val', 'pred_test', 'train_idx', 'val_idx', 'test_idx', 'inference_preds',
@@ -386,17 +377,23 @@ for r in results_flat:
 inference_results_df = pd.DataFrame(inf_rows)
 with open("5_selection_meta.pkl", "wb") as f:
     pickle.dump(selection_meta_df, f)
-print(f"Saved selection metadata to 5_selection_meta.pkl ({len(selection_meta_df)} rows)")
 with open("5_results_df.pkl", "wb") as f:
     pickle.dump({"results_df": results_df, "inference_by_target": inference_results_df}, f)
-print(f"Saved results_df + inference_by_target to 5_results_df.pkl ({len(results_df)} CV rows, {len(inference_results_df)} inference rows)")
 
 # Build output df: original df + one column per (var, fold, model) with train/val/test predictions
 # on every row in each split (not only rows with observed target). Inference preds use the same splits.
 out_df = df.copy()
+pred_cols = []
+for r in results_flat:
+    pred_cols.append(f"pred_{r['var']}_fold{r['fold']}_{r['model']}")
+    pred_cols.extend(
+        f"pred_{r['var']}_fold{r['fold']}_{r['model']}_inf_{_safe_infer_col_suffix(ip['inference_target'])}"
+        for ip in (r.get('inference_preds') or [])
+        if ip.get('pred_train') is not None
+    )
+out_df = pd.concat([out_df, pd.DataFrame(np.nan, index=out_df.index, columns=pred_cols)], axis=1)
 for r in results_flat:
     col = f"pred_{r['var']}_fold{r['fold']}_{r['model']}"
-    out_df[col] = np.nan
     out_df.loc[r['train_idx'], col] = r['pred_train']
     out_df.loc[r['val_idx'], col] = r['pred_val']
     out_df.loc[r['test_idx'], col] = r['pred_test']
@@ -405,7 +402,6 @@ for r in results_flat:
             continue
         suf = _safe_infer_col_suffix(ip['inference_target'])
         icol = f"pred_{r['var']}_fold{r['fold']}_{r['model']}_inf_{suf}"
-        out_df[icol] = np.nan
         out_df.loc[r['train_idx'], icol] = ip['pred_train']
         out_df.loc[r['val_idx'], icol] = ip['pred_val']
         out_df.loc[r['test_idx'], icol] = ip['pred_test']
@@ -413,14 +409,13 @@ with open("5_with_predictions.pkl", "wb") as f:
     pickle.dump(out_df, f)
 _pred_cols = [c for c in out_df.columns if c.startswith('pred_')]
 _n_inf = sum(1 for c in _pred_cols if '_inf_' in c)
-print(f"Saved predictions to 5_with_predictions.pkl ({len(out_df)} rows, {len(_pred_cols)} pred columns incl. {_n_inf} inference)")
 
 import matplotlib.pyplot as plt
-model_order = [m for m in MODEL_NAMES if m in results_df['model'].values]
-combo_order = [f"{v}-{m}" for v in vars_order for m in model_order]
+model_order = [m for m in TRAIN_DEFAULTS['models'] if m in results_df['model'].values]
+combo_order = [f"{v}-{m}" for v in TARGET_CONFIG.keys() for m in model_order]
 data = [
     results_df[(results_df['var'] == v) & (results_df['model'] == m)]['test r2'].values
-    for v in vars_order for m in model_order
+    for v in TARGET_CONFIG.keys() for m in model_order
 ]
 plt.figure(figsize=(max(10, len(combo_order) * 0.5), 5))
 plt.boxplot(data, tick_labels=combo_order)
