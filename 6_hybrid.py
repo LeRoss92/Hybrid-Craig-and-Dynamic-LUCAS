@@ -9,15 +9,27 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from hybrid_models import craig_BA_adapt, analytical_steady_state
-from config import default_param_ranges, predictors_dynamic, predictors_2015, predictors_2018, log_cols
+from config import default_param_ranges, predictors_avg, log_cols
 from hybrid_utils import vector_field, simulate_final_state, init_mlp, build_param_matrix, eval_loss, init_adam, eval_r2, train_step, pools_to_loss_targets
 
-dt0 = 0.05 # years
+# # dynamic (alternate hyperparameters)
+# depth = 5
+# width = 128#512#
+# lr = 5e-4
+# batch_size = 1024
+# n_steps = 1000 # epochs
+# early_stop_patience = 100 # epochs
+
+# ODE time step for dynamic mode (2009_2018)
+dt0 = 0.025  # years
+
+# static
 depth = 5
-width = 512
-lr = 2e-4
+width = 512#
+lr = 5e-4
 batch_size = 1024
 n_steps = 3000 # epochs
+early_stop_patience = 500 # epochs
 
 TARGET_LABELS = {
     "SOC": ["SOC"],
@@ -30,14 +42,31 @@ def log_and_stocks(df):
     helper_df = df.copy()
     for col in log_cols:
         helper_df[col] = np.log1p(helper_df[col])
+    maoc_cols = [
+        "pred_MAOC_median_LinReg_inf_MAOC_index_2009",
+        "pred_MAOC_median_LinReg_inf_MAOC_index_2015",
+        "pred_MAOC_median_LinReg_inf_MAOC_index_2018",
+    ]
+    mic_cols = [
+        "pred_MIC_median_LinReg_inf_Cmic_index_2009",
+        "pred_MIC_median_LinReg_inf_Cmic_index_2015",
+        "pred_MIC_median_LinReg_inf_Cmic_index_2018",
+    ]
+    r_maoc_avg = helper_df[maoc_cols].mean(axis=1)
+    r_mic_avg = helper_df[mic_cols].mean(axis=1)
+    helper_df["y_avg_C"] = helper_df["OC_avg_09_15_18"]
+    helper_df["y_avg_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y_avg_C"]
+    helper_df["y_avg_Cb"] = r_mic_avg * helper_df["y_avg_C"]
+    helper_df["y_avg_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y_avg_C"]
     helper_df["y2009_C"] = helper_df["OC_avg_09_15_18"] - helper_df["SOC_linreg_slope"] * 4.5
     helper_df["y2018_C"] = helper_df["OC_avg_09_15_18"] + helper_df["SOC_linreg_slope"] * 4.5
-    helper_df["y2009_Cm"] = helper_df["pred_MAOC_median_LinReg_inf_MAOC_index_2009"]          * (1 - helper_df["pred_MIC_median_LinReg_inf_Cmic_index_2009"])     * helper_df["y2009_C"]              
-    helper_df["y2009_Cb"] = helper_df["pred_MIC_median_LinReg_inf_Cmic_index_2009"]                                                                                     * helper_df["y2009_C"]                                       
-    helper_df["y2009_Cp"] = (1 - helper_df["pred_MAOC_median_LinReg_inf_MAOC_index_2009"])    * (1 - helper_df["pred_MIC_median_LinReg_inf_Cmic_index_2009"])     * helper_df["y2009_C"]         
-    helper_df["y2018_Cm"] = helper_df["pred_MAOC_median_LinReg_inf_MAOC_index_2018"]          * (1 - helper_df["pred_MIC_median_LinReg_inf_Cmic_index_2018"])     * helper_df["y2018_C"] 
-    helper_df["y2018_Cb"] = helper_df["pred_MIC_median_LinReg_inf_Cmic_index_2018"]                                                                                     * helper_df["y2018_C"] 
-    helper_df["y2018_Cp"] = (1 - helper_df["pred_MAOC_median_LinReg_inf_MAOC_index_2018"])    * (1 - helper_df["pred_MIC_median_LinReg_inf_Cmic_index_2018"])     * helper_df["y2018_C"] 
+    helper_df["y2009_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y2009_C"]
+    helper_df["y2009_Cb"] = r_mic_avg * helper_df["y2009_C"]
+    helper_df["y2009_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y2009_C"]
+    helper_df["y2018_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y2018_C"]
+    helper_df["y2018_Cb"] = r_mic_avg * helper_df["y2018_C"]
+    helper_df["y2018_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y2018_C"]
+    helper_df["input_avg_09_15_18"] = helper_df[["input_2009", "input_2015", "input_2018"]].mean(axis=1)
     return helper_df
 
 def observed_derived_targets(helper_df, temp, use_dynamic, targets_arg):
@@ -47,24 +76,24 @@ def observed_derived_targets(helper_df, temp, use_dynamic, targets_arg):
         y1 = helper_df[["y2018_Cp", "y2018_Cb", "y2018_Cm"]].to_numpy()
         d = y1 - y0
         soc_sum = np.sum(d, axis=1, keepdims=True)
-        soc_lvl = np.sum(y1, axis=1, keepdims=True) + 1e-12
-        mic_r = y1[:, 1:2] / soc_lvl
-        maoc_r = y1[:, 2:3] / soc_lvl
+        # MICi / MAOCi: pool deltas (Cb, Cm), same units as SOC delta
+        mic_extra = d[:, 1:2]
+        maoc_extra = d[:, 2:3]
     else:
-        cols = [f"y{temp}_Cp", f"y{temp}_Cb", f"y{temp}_Cm"]
+        cols = ["y_avg_Cp", "y_avg_Cb", "y_avg_Cm"]
         pools = helper_df[cols].to_numpy()
         soc_sum = np.sum(pools, axis=1, keepdims=True)
         soc_lvl = np.sum(pools, axis=1, keepdims=True) + 1e-12
-        mic_r = pools[:, 1:2] / soc_lvl
-        maoc_r = pools[:, 2:3] / soc_lvl
+        mic_extra = pools[:, 1:2] / soc_lvl
+        maoc_extra = pools[:, 2:3] / soc_lvl
     if ta == "SOC":
         return jnp.asarray(soc_sum)
     if ta == "SOC,MICi":
-        return jnp.asarray(np.concatenate([soc_sum, mic_r], axis=1))
+        return jnp.asarray(np.concatenate([soc_sum, mic_extra], axis=1))
     if ta == "SOC,MAOCi":
-        return jnp.asarray(np.concatenate([soc_sum, maoc_r], axis=1))
+        return jnp.asarray(np.concatenate([soc_sum, maoc_extra], axis=1))
     if ta == "SOC,MAOCi,MICi":
-        return jnp.asarray(np.concatenate([soc_sum, maoc_r, mic_r], axis=1))
+        return jnp.asarray(np.concatenate([soc_sum, maoc_extra, mic_extra], axis=1))
     raise KeyError(ta)
 
 def main():
@@ -91,7 +120,7 @@ def main():
 
         # build mechanistic models
         batched_steady = jax.vmap(partial(analytical_steady_state, microbial_decomposition=args.md, microbial_turnover=args.mt, saturation=args.sat)) # vmap analytical solution
-        t0, t1 = 0.0, 3.0
+        t0, t1 = 0.0, 9.0
         solver = dfx.Euler()
         model_fn = partial(craig_BA_adapt, microbial_decomposition=args.md, microbial_turnover=args.mt, saturation=args.sat)
         term = dfx.ODETerm(partial(vector_field, model_fn))
@@ -100,9 +129,8 @@ def main():
         # preprocess: get data, log some features & calculate stocks, get split indices, impute, create targets, normalize
         df = pd.read_pickle("5_with_predictions.pkl") # get data
         helper_df = log_and_stocks(df) # log specified variables and calculate stocks
-        predictors = {"2009_2018": predictors_dynamic, "2015": predictors_2015, "2018": predictors_2018}[args.temp] # use only respective predictors
-        npp_year = "2015" if args.temp in {"2015", "2009_2018"} else "2018"
-        npp_col = f"input_{npp_year}"
+        predictors = predictors_avg
+        npp_col = "input_avg_09_15_18"
         npp_mask = (
             helper_df[npp_col].notna()
             & np.isfinite(helper_df[npp_col])
@@ -145,7 +173,6 @@ def main():
         loss_ema, ema_beta, weights = jnp.ones((n_targ,)) * target_mask, 0.9, jnp.ones((n_targ,)) * target_mask # set up loss
         opt_state, best_params, best_test = init_adam(params), params, float("inf") # init optimizer and identification of best epoch
         best_step = 0
-        early_stop_patience = 500
         
         # training
         init_y_loss = eval_loss(params, x_train, npp_I_train, y0_train, y_train, weights, param_mins=param_mins, param_maxs=param_maxs, global_mask=global_mask, use_dynamic=use_dynamic, batched_sim=batched_sim, batched_steady=batched_steady, target_mean=target_mean, target_std=target_std, targets_arg=args.targets)[0]

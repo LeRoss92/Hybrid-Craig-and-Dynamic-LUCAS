@@ -446,36 +446,44 @@ TRAIN_DEFAULTS = {
 
 # Legacy exports for 6_hybrid, 7_analysis, sensitivity_analysis
 predictors_dynamic = (
-    pred_groups['Texture'] 
+    pred_groups['Texture']
+    + pred_groups['Mineral Activity'][2015]
     + pred_groups['Ox. ex. Al/Fe']
-    + pred_groups['Mineral Activity'][2015] 
-    # + pred_groups['MODIS NPP 20xx-2a'][2015]
-    + pred_groups['WorldClim'][2015] 
-    + pred_groups['LUCAS normal'][2015]
-    + pred_groups['AlphaEarth 2017+2018'][2015] 
-    + pred_groups['LUCAS log'][2015]
+    + pred_groups['LUCAS normal avg']
+    + pred_groups['Fluxcom_era5l change']
+    + pred_groups['Fluxcom_era5l avg']
+    # + pred_groups['WorldClim'][2015]
+    # + pred_groups['AlphaEarth 2017+2018'][2015]
+    + pred_groups['doy change']
+    + pred_groups['doy avg']
+    + pred_groups['OC (log) avg'] + pred_groups['LUCAS log avg']
 )
+# Same time-aggregated predictors for hybrid steady-state (replaces single-year 2015/2018 columns).
+predictors_avg = predictors_dynamic
+# Same predictor composition as targets_metainfo SOC15 / SOC18 (Fluxcom + doy; no WorldClim/AlphaEarth).
 predictors_2015 = (
-    pred_groups['Texture'] 
+    pred_groups['Texture']
+    + pred_groups['Mineral Activity'][2015]
     + pred_groups['Ox. ex. Al/Fe']
-    + pred_groups['Mineral Activity'][2015] 
-    # + pred_groups['MODIS NPP 20xx-2a'][2015]
-    + pred_groups['WorldClim'][2015] 
     + pred_groups['LUCAS normal'][2015]
-    + pred_groups['AlphaEarth 2017+2018'][2015] 
+    + pred_groups['Fluxcom_era5l'][2015]
+    # + pred_groups['WorldClim'][2015]
+    # + pred_groups['AlphaEarth 2017+2018'][2015]
+    + pred_groups['doy'][2015]
     + pred_groups['LUCAS log'][2015]
 )
 predictors_2018 = (
-    pred_groups['Texture'] 
+    pred_groups['Texture']
+    + pred_groups['Mineral Activity'][2018]
     + pred_groups['Ox. ex. Al/Fe']
-    + pred_groups['Mineral Activity'][2018] 
-    # + pred_groups['MODIS NPP 20xx-2a'][2018]
-    + pred_groups['WorldClim'][2018] 
     + pred_groups['LUCAS normal'][2018]
-    + pred_groups['AlphaEarth 2017+2018'][2018] 
+    + pred_groups['Fluxcom_era5l'][2018]
+    # + pred_groups['WorldClim'][2018]
+    # + pred_groups['AlphaEarth 2017+2018'][2018]
+    + pred_groups['doy'][2018]
     + pred_groups['LUCAS log'][2018]
 )
-log_cols = pred_groups['LUCAS log'][2015] + pred_groups['LUCAS log'][2018]
+log_cols = pred_groups['LUCAS log'][2015] + pred_groups['LUCAS log'][2018]+ pred_groups['OC (log) avg'] + pred_groups['LUCAS log avg']
 
 # BD = 1.3  # g cm^-3 (bulk density, used for unit conversions)
 BD = 1.0  # g cm^-3 (bulk density, used for unit conversions) -> now contents instead of stock modeled

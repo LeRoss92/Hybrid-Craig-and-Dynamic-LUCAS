@@ -6,6 +6,29 @@ import diffrax as dfx
 
 
 def init_mlp(key, sizes):
+    """
+    Initialize parameters for a multilayer perceptron (MLP).
+
+    Args:
+        key: jax.random.PRNGKey
+            Random key for parameter initialization.
+        sizes: list or tuple of int
+            A list of sizes (number of units) for each layer, 
+            where len(sizes) = number of layers + 1.
+            For example, [in_dim, hidden1, hidden2, ..., out_dim].
+
+    Returns:
+        params: list of tuples
+            A list where each element is a tuple (w, b) representing the weights and biases 
+            for a layer. 
+            - w has shape (in_dim, out_dim)
+            - b has shape (out_dim,)
+            The weights for the last layer are scaled differently (0.01), 
+            all other layers use He initialization (sqrt(2.0/in_dim)).
+    
+    Example:
+        params = init_mlp(jax.random.PRNGKey(0), [4, 64, 32, 1])
+    """
     params = []
     keys = jax.random.split(key, len(sizes))
     last_idx = len(sizes) - 2
@@ -20,6 +43,24 @@ def init_mlp(key, sizes):
 
 
 def mlp_forward(params, x):
+    """
+    Forward pass through a multilayer perceptron (MLP).
+
+    Args:
+        params: list of tuples
+            A list of (w, b) tuples for each layer of the MLP,
+            where w is the weight matrix and b is the bias vector.
+        x: jnp.ndarray
+            Input tensor of shape (batch_size, input_dim) or (input_dim,).
+
+    Returns:
+        jnp.ndarray:
+            The output of the MLP. For a final layer with out_dim units, shape will be (batch_size, out_dim).
+
+    Notes:
+        - Uses GELU nonlinearity for all hidden layers.
+        - The last layer is linear (no activation function applied).
+    """
     for w, b in params[:-1]:
         x = jax.nn.gelu(x @ w + b)
     w, b = params[-1]
@@ -35,14 +76,47 @@ def normalize_targets(y, target_mean, target_std):
 
 
 def pools_to_loss_targets(y_cmp, y0, use_dynamic, targets_arg):
-    """Map mechanistic (Cp,Cb,Cm) deltas or levels to loss/R² targets: SOC sum and optional MAOC/MIC fractions."""
+    """
+    Converts model predictions of compartment pools into loss targets appropriate for different training tasks.
+
+    Args:
+        y_cmp (jnp.ndarray): Model output pools representing either the change in pool sizes (if use_dynamic=True) 
+            or the absolute pool sizes (if use_dynamic=False). Shape (..., 3).
+        y0 (jnp.ndarray): Initial pool values (required if use_dynamic=True), same shape as y_cmp.
+        use_dynamic (bool): 
+            - If True, y_cmp contains the *change* in pool sizes since y0, and final total pools are y_cmp + y0.
+            - If False, y_cmp contains the *absolute* pool sizes, and y0 is ignored.
+        targets_arg (str): Specifies which target variables to compute. Options are:
+            - "SOC": total SOC only.
+            - "SOC,MICi": total SOC and (dynamic: ΔCb | steady: microbial fraction).
+            - "SOC,MAOCi": total SOC and (dynamic: ΔCm | steady: MAOC fraction).
+            - "SOC,MAOCi,MICi": total SOC and both MAOC and MIC (dynamic: ΔCm, ΔCb | steady: fractions).
+
+    Returns:
+        jnp.ndarray: Target array for loss computation, concatenated as needed for the output type.
+            - Shape (..., n_targets), where n_targets depends on targets_arg.
+
+    Raises:
+        KeyError: If targets_arg is not a recognized target specification.
+
+    Notes:
+        - The order of pools in y_cmp and y0 is assumed to be: [Cp, Cb, Cm] (particulate, microbial, MAOC).
+        - Steady-state: MICi/MAOCi are fractions of final pools. Dynamic: MICi/MAOCi are ΔCb / ΔCm.
+    """
     soc_sum = jnp.sum(y_cmp, axis=-1, keepdims=True)
     if targets_arg == "SOC":
         return soc_sum
     if use_dynamic:
-        y_fin = y_cmp + y0
-    else:
-        y_fin = y_cmp
+        mic_delta = y_cmp[:, 1:2]
+        maoc_delta = y_cmp[:, 2:3]
+        if targets_arg == "SOC,MICi":
+            return jnp.concatenate([soc_sum, mic_delta], axis=-1)
+        if targets_arg == "SOC,MAOCi":
+            return jnp.concatenate([soc_sum, maoc_delta], axis=-1)
+        if targets_arg == "SOC,MAOCi,MICi":
+            return jnp.concatenate([soc_sum, maoc_delta, mic_delta], axis=-1)
+        raise KeyError(targets_arg)
+    y_fin = y_cmp
     soc_lvl = jnp.sum(y_fin, axis=-1, keepdims=True) + 1e-12
     mic_r = y_fin[:, 1:2] / soc_lvl
     maoc_r = y_fin[:, 2:3] / soc_lvl
@@ -74,32 +148,8 @@ def build_param_matrix(
     return local_params
 
 
-def eval_components(
-    params,
-    x_batch,
-    npp_I_batch,
-    y0_batch,
-    y_target,
-    *,
-    param_mins,
-    param_maxs,
-    global_mask,
-    use_dynamic,
-    batched_sim,
-    batched_steady,
-    target_mean,
-    target_std,
-    targets_arg,
-    ):
-    p_pred = build_param_matrix(
-        params["net"],
-        params["global"],
-        x_batch,
-        npp_I_batch,
-        param_mins=param_mins,
-        param_maxs=param_maxs,
-        global_mask=global_mask,
-    )
+def eval_components(params, x_batch, npp_I_batch, y0_batch, y_target, *, param_mins, param_maxs, global_mask, use_dynamic, batched_sim, batched_steady, target_mean, target_std, targets_arg):
+    p_pred = build_param_matrix(params["net"], params["global"], x_batch, npp_I_batch, param_mins=param_mins, param_maxs=param_maxs, global_mask=global_mask)
     if use_dynamic:
         y_pred = batched_sim(p_pred, y0_batch)
         y_pred_compare = y_pred - y0_batch

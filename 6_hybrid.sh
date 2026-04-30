@@ -3,7 +3,7 @@
 source ~/.bashrc
 micromamba activate DPL_JAX_copy
 
-temps=('2015' '2018' '2015_2018')
+temps=('2009_2018')
 microbial_decompositions=('linear' 'MM' 'RMM')
 microbial_turnovers=('linear' 'density_dependent')
 saturations=('no' 'Langmuir')
