@@ -8,28 +8,15 @@ from functools import partial
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from hybrid_models import craig_BA_adapt, analytical_steady_state
-from config import default_param_ranges, predictors_avg, log_cols
-from hybrid_utils import vector_field, simulate_final_state, init_mlp, build_param_matrix, eval_loss, init_adam, eval_r2, train_step, pools_to_loss_targets
+from models import craig_BA_adapt, analytical_steady_state
+from config import default_param_ranges, predictors_dynamic, predictors_static, log_cols
+from utils import vector_field, simulate_final_state, init_mlp, build_param_matrix, eval_loss, init_adam, eval_r2, train_step, pools_to_loss_targets
 
-# # dynamic (alternate hyperparameters)
-# depth = 5
-# width = 128#512#
-# lr = 5e-4
-# batch_size = 1024
-# n_steps = 1000 # epochs
-# early_stop_patience = 100 # epochs
 
-# ODE time step for dynamic mode (2009_2018)
 dt0 = 0.025  # years
-
-# static
 depth = 5
-width = 512#
-lr = 5e-4
+width = 128
 batch_size = 1024
-n_steps = 3000 # epochs
-early_stop_patience = 500 # epochs
 
 TARGET_LABELS = {
     "SOC": ["SOC"],
@@ -99,14 +86,28 @@ def observed_derived_targets(helper_df, temp, use_dynamic, targets_arg):
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--temp"); parser.add_argument("--fold"); parser.add_argument("--md"); parser.add_argument("--mt"); parser.add_argument("--sat"); parser.add_argument("--targets"); args = parser.parse_args()
     start_time = time.perf_counter()
-    use_dynamic = args.temp == "2009_2018"
+    use_dynamic = args.temp == "dynamic"
 
-    sensitivities = pd.read_csv("sensitivities.csv") # load importances
+    if use_dynamic:
+        # dynamic
+        lr = 5e-4
+        n_steps = 1000 # epochs
+        early_stop_patience = 100 # epochs
+    else:
+        # static
+        lr = 5e-4
+        n_steps = 3000 # epochs
+        early_stop_patience = 500 # epochs
+
+    sensitivities = pd.read_csv("figures/sensitivities.csv") # load importances
     model_sens = sensitivities[(sensitivities["md"] == args.md) & (sensitivities["mt"] == args.mt) & (sensitivities["sat"] == args.sat) & (sensitivities["temp"] == ("dynamic" if use_dynamic else "steady"))].iloc[0] # pick for this combination
     param_sens = model_sens.drop(labels=["md", "mt", "sat", "temp", "y0_Cp", "y0_Cb", "y0_Cm"]) # pick only parameters
     nonzero_params = [name for name, val in param_sens.items() if name != "I" and val != 0.0] # create list of non 0.0 (excluding I)
     sorted_params = sorted(nonzero_params, key=lambda name: abs(param_sens[name])) # sort this list by abs()
-    for i in range(len(sorted_params)+1): # loop over list
+    n_global_iters = len(sorted_params) + 1
+    if os.environ.get("HYBRID_MAX_GLOBAL_ITERS"):
+        n_global_iters = min(n_global_iters, int(os.environ["HYBRID_MAX_GLOBAL_ITERS"]))
+    for i in range(n_global_iters): # loop over list
         global_names = [n for n, v in param_sens.items() if v == 0.0] + sorted_params[:i] # create which are to use global (0.0 and 0,1,2,3... of the ones in the list)
         print('global parameters:', global_names)
         param_names = list(default_param_ranges.keys())
@@ -127,9 +128,12 @@ def main():
         batched_sim = jax.vmap(lambda p, y0: simulate_final_state(p, y0, t0, t1, dt0, term, solver)) # vmap solver
 
         # preprocess: get data, log some features & calculate stocks, get split indices, impute, create targets, normalize
-        df = pd.read_pickle("5_with_predictions.pkl") # get data
+        df = pd.read_pickle("1_preprocessed.pkl") # get data
         helper_df = log_and_stocks(df) # log specified variables and calculate stocks
-        predictors = predictors_avg
+        if use_dynamic:
+            predictors = predictors_dynamic
+        else:
+            predictors = predictors_static
         npp_col = "input_avg_09_15_18"
         npp_mask = (
             helper_df[npp_col].notna()
@@ -226,9 +230,9 @@ def main():
         df_out = pd.DataFrame(np.c_[jax.device_get(targets), pred_derived, pred_final_all, params_all], index=original_idx, columns=out_cols)
 
         # save results
-        os.makedirs("6_hybrid_outputs", exist_ok=True)  # ensure folder exists
+        os.makedirs("hybrid_outputs", exist_ok=True)  # ensure folder exists
         file_name = f"hybrid_temp{args.temp}_fold{args.fold}_md{args.md}_mt{args.mt}_sat{args.sat}_targets{args.targets.replace(',', '-')}_globals{'none' if not global_names else '-'.join(global_names)}.pkl"
-        df_out.to_pickle(os.path.join("6_hybrid_outputs", file_name)) # pickle
+        df_out.to_pickle(os.path.join("hybrid_outputs", file_name)) # pickle
         print(f"total_time_sec {time.perf_counter() - start_time:.0f}: {file_name}")
 
 if __name__ == "__main__":

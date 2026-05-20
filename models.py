@@ -433,3 +433,84 @@ def analytical_steady_state(
         )
 
     return jnp.array([Cp_star, Cb_star, Cm_star])
+
+
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LinearRegression, QuantileRegressor, ElasticNet, BayesianRidge, Ridge, TweedieRegressor, Lasso
+from sklearn.cross_decomposition import PLSRegression
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor
+from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.preprocessing import SplineTransformer, PolynomialFeatures
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+from catboost import CatBoostRegressor
+
+
+def get_models(seed=4210):
+    """
+    Initialize and return the MODELS dictionary.
+    
+    Parameters
+    ----------
+    seed : int, default=4210
+        Random seed for reproducibility.
+    
+    Returns
+    -------
+    dict
+        Dictionary of model configurations.
+    """
+    MODELS = {
+        # ============================== Fast ==============================
+        'LinReg': {
+            'model': LinearRegression(),
+            'params': {},
+        },
+        'Piecewise_Linear_Reg': {
+            'model': Pipeline([
+                ("spline", SplineTransformer(degree=1,n_knots=3,include_bias=False)),
+                ("interactions", PolynomialFeatures(degree=2, interaction_only=True, # no squared terms (x1 with x1)
+                    include_bias=False)), # already exists
+                ("ridge", Ridge(alpha=1.0)) ]),
+            'params': {
+                'spline__n_knots': [3],    #, 5               # 2 = linear regression, 3=two pieces
+                'spline__degree': [1],                       # linear vs polynomial splines
+                'spline__include_bias': [False],                # True: x=y=0
+                'interactions__degree': [2],    # 2            # 1: no interactions, 2: pairwise...
+                'ridge__alpha': [0.01],       #  0.001, 0.5          # 1e-6: minimal regularization for numerical stability
+            },
+            'n_jobs': 32,  # Use workers for GridSearchCV (when not parallelizing candidates)
+            'n_jobs_feature_selection': 32  # Parallelize candidate feature evaluation (one candidate per worker)
+        },
+        'XGB': {
+            'model': XGBRegressor(
+                n_estimators=50,
+                learning_rate=0.1,
+                max_depth=6,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                tree_method='hist',
+                device="cpu",
+                n_jobs=1,
+                verbosity=0,
+                random_state=seed
+            ),
+            'n_jobs': 1,
+            'params': {
+                'n_estimators': [150],
+                'max_depth': [5],
+                'learning_rate': [0.05],
+                'subsample': [0.8],
+                'colsample_bytree': [0.8], # 0.5
+                'min_child_weight': [1] # , 5
+            },
+            'n_jobs_feature_selection': 5
+        },
+    }
+    return MODELS
+

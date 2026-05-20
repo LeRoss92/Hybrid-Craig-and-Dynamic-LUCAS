@@ -3,14 +3,14 @@
 source ~/.bashrc
 micromamba activate DPL_JAX_copy
 
-temps=('2009_2018')
+temps=('static' 'dynamic')
 microbial_decompositions=('linear' 'MM' 'RMM')
 microbial_turnovers=('linear' 'density_dependent')
 saturations=('no' 'Langmuir')
 targets_combinations=('SOC' 'SOC,MICi' 'SOC,MAOCi' 'SOC,MAOCi,MICi')
-folds=(0 1 2 3 4 5 6 7 8 9)
+folds=(3 4 5) #  3 4 5 6 7 8 9 0 1 2
 
-mkdir -p 6_hybrid_outputs
+mkdir -p hybrid_outputs
 
 combinations=()
 for md in "${microbial_decompositions[@]}"; do
@@ -77,7 +77,7 @@ while [ $combo_index -lt $total ] || [ ${#job_ids[@]} -gt 0 ]; do
     
     while [ $combo_index -lt $total ] && [ $tracked -lt 24 ]; do
         combo="${combinations[$combo_index]}"
-        job_output=$(sbatch 6_hybrid_single.sh "$combo" 2>&1)
+        job_output=$(sbatch 2_hybrid_single.sh "$combo" 2>&1)
         job_id=$(echo "$job_output" | grep -o 'Submitted batch job [0-9]*' | grep -o '[0-9]*')
         if [ -n "$job_id" ]; then
             job_ids+=($job_id)
