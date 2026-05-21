@@ -1,37 +1,28 @@
 import jax
 import jax.numpy as jnp
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LinearRegression, QuantileRegressor, ElasticNet, BayesianRidge, Ridge, TweedieRegressor, Lasso
+from sklearn.cross_decomposition import PLSRegression
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor
+from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.preprocessing import SplineTransformer, PolynomialFeatures
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+from catboost import CatBoostRegressor
 
 
-def craig_BA_adapt(
-    t,
-    y,
-    p,
-    microbial_decomposition="linear",
-    microbial_turnover="linear",
-    carbon_use_efficiency="constant",
-    saturation="no",):
+def craig_BA_adapt(t, y, p, microbial_decomposition="linear", microbial_turnover="linear", carbon_use_efficiency="constant", saturation="no"):
     Cp, Cb, Cm = y
     # Clamp pools for rate computations to avoid non-physical negative states
     # triggering unstable MM terms during integration.
     Cp_pos = jnp.maximum(Cp, 1e-12)
     Cb_pos = jnp.maximum(Cb, 1e-12)
     Cm_pos = jnp.maximum(Cm, 1e-12)
-    (
-        I,
-        CUE,
-        beta,
-        tmb,
-        Cg0b,
-        Cg0m,
-        qx,
-        Vmax_p,
-        Vmax_m,
-        Km_p,
-        Km_m,
-        kp,
-        kb,
-        km,
-    ) = p
+    I, CUE, beta, tmb, Cg0b, Cg0m, qx, Vmax_p, Vmax_m, Km_p, Km_m, kp, kb, km = p
 
     if microbial_decomposition == "linear":
         def mic_dec(k_i, Vmax_i, Cb_i, Km_i, C_i):
@@ -65,41 +56,6 @@ def craig_BA_adapt(
     elif saturation == "Langmuir":
         def sat(tmb_i, Cg0m_i, C_m, qx_i):
             return 1 - C_m / Cg0m_i
-    elif saturation == "exponential":
-        def sat(tmb_i, Cg0m_i, C_m, qx_i):
-            return tmb_i * jnp.exp(-C_m / Cg0m_i)
-    elif saturation == "MM":
-        def sat(tmb_i, Cg0m_i, C_m, qx_i):
-            return tmb_i * Cg0m_i / (Cg0m_i + C_m)
-    elif saturation == "freundlich":
-        def sat(tmb_i, Cg0m_i, C_m, qx_i):
-            n = 0.7 * qx_i
-            return tmb_i * (1 - (C_m / Cg0m_i) ** n)
-    elif saturation == "step":
-        def sat(tmb_i, Cg0m_i, C_m, qx_i):
-            k = 50.0 * qx_i
-            return tmb_i / (1 + jnp.exp(k * (C_m - Cg0m_i) / Cg0m_i))
-    elif saturation == "logistic":
-        def sat(tmb_i, Cg0m_i, C_m, qx_i):
-            k = 10.0 * qx_i
-            return tmb_i / (1 + jnp.exp(k * (C_m - Cg0m_i) / Cg0m_i))
-    elif saturation == "power":
-        def sat(tmb_i, Cg0m_i, C_m, qx_i):
-            alpha = 0.5 * qx_i
-            return tmb_i * (1 - (C_m / Cg0m_i) ** alpha)
-    elif saturation == "linear_threshold":
-        def sat(tmb_i, Cg0m_i, C_m, qx_i):
-            threshold = 0.8 * qx_i * Cg0m_i
-            k = 30.0 * qx_i
-            weight_before = 1.0 / (1 + jnp.exp(k * (C_m - threshold) / Cg0m_i))
-            weight_after = 1.0 - weight_before
-
-            value_before = tmb_i
-            denom = jnp.maximum(Cg0m_i - threshold, 1e-10)
-            linear_factor = jnp.maximum(0, 1 - (C_m - threshold) / denom)
-            value_after = tmb_i * linear_factor
-
-            return value_before * weight_before + value_after * weight_after
 
     saturation_fraction = sat(tmb, Cg0m, Cm_pos, qx)
     total_turnover = mic_tur(kb, Cb_pos, beta)
@@ -117,21 +73,13 @@ def craig_BA_adapt(
 
     return jnp.array([dCpdt, dCbdt, dCmdt])
 
-
-def analytical_steady_state(
-    p,
-    microbial_decomposition="linear",
-    microbial_turnover="linear",
-    saturation="no",
-    ):
+def analytical_steady_state(p, microbial_decomposition="linear", microbial_turnover="linear", saturation="no"):
     dec = microbial_decomposition
     tur = microbial_turnover
     sat = saturation
 
-    # Unpack parameters
     I, CUE, beta, tmb, Cg0b, Cg0m, qx, Vmax_p, Vmax_m, Km_p, Km_m, kp, kb, km = p
     eps = 1e-12
-    n_freundlich = 0.7 * qx
 
     def positive_quadratic_root(a, b, c):
         a = jnp.asarray(a)
@@ -165,9 +113,6 @@ def analytical_steady_state(
             return tmb
         if sat == "Langmuir":
             return 1.0 - Cm / Cg0m
-        if sat == "freundlich":
-            return tmb * (1.0 - (Cm / Cg0m) ** n_freundlich)
-        raise ValueError(f"Unsupported saturation option: {sat}")
 
     def bracketed_bisection(func, lower, upper, max_iter=200, tol=1e-12):
         xs = jnp.linspace(lower, upper, 200)
@@ -224,16 +169,6 @@ def analytical_steady_state(
                 b = (-CUE * km + km + (CUE * I) / Cg0m)
                 c = -CUE * I
                 return positive_quadratic_root(a, b, c)
-            if sat == "freundlich":
-                upper = jnp.maximum(Cg0m * (1.0 - 1e-9), 1.0)
-
-                def func(cm):
-                    cm_c = jnp.clip(cm, eps, Cg0m * (1.0 - 1e-9))
-                    s_val = tmb * (1.0 - (cm_c / Cg0m) ** n_freundlich)
-                    return s_val * CUE * (I + km * cm_c) - km * cm_c
-
-                return bracketed_bisection(func, eps, upper)
-            return jnp.nan
 
         Cm_star = solve_cm_linear()
         cm_valid = ~jnp.isnan(Cm_star)
@@ -260,16 +195,6 @@ def analytical_steady_state(
                 b = Vmax_m + (kb * Km_m) / Cg0m - kb
                 c = -kb * Km_m
                 return positive_quadratic_root(a, b, c)
-            if sat == "freundlich":
-                upper = jnp.maximum(Cg0m * (1.0 - 1e-9), 1.0)
-
-                def func(cm):
-                    cm_c = jnp.clip(cm, eps, Cg0m * (1.0 - 1e-9))
-                    s_val = tmb * (1.0 - (cm_c / Cg0m) ** n_freundlich)
-                    return s_val * kb - (Vmax_m * cm_c) / (Km_m + cm_c)
-
-                return bracketed_bisection(func, eps, upper)
-            return jnp.nan
 
         def solve_cm_mm_density():
             if sat == "no":
@@ -297,11 +222,7 @@ def analytical_steady_state(
                 result = lhs - rhs
                 return jnp.where(valid_B, result, jnp.nan)
 
-            upper = (
-                Cg0m * (1.0 - 1e-9)
-                if sat in ("Langmuir", "freundlich")
-                else jnp.maximum(10.0 * Km_m, 1.0)
-            )
+            upper = (Cg0m * (1.0 - 1e-9) if sat == "Langmuir" else jnp.maximum(10.0 * Km_m, 1.0))
             return bracketed_bisection(cm_equation, eps, upper)
 
         if tur == "linear":
@@ -350,31 +271,8 @@ def analytical_steady_state(
                 Cm = bracketed_bisection(equation, eps, upper)
                 cm_valid = ~jnp.isnan(Cm)
                 S = 1.0 - Cm / Cg0m
-                Cb = jnp.where(
-                    cm_valid, (CUE * I) / (kb * (1.0 - CUE * S)), Cg0b
-                )
+                Cb = jnp.where(cm_valid, (CUE * I) / (kb * (1.0 - CUE * S)), Cg0b)
                 return Cb, Cm
-
-            if sat == "freundlich":
-                def equation(Cm):
-                    Cm_c = jnp.clip(Cm, eps, Cg0m * (1.0 - 1e-9))
-                    S = tmb * (1.0 - (Cm_c / Cg0m) ** n_freundlich)
-                    denom_cb = kb * (1.0 - CUE * S)
-                    valid = denom_cb > eps
-                    Cb = jnp.where(valid, (CUE * I) / denom_cb, jnp.nan)
-                    Cm_calc = S * kb * (Km_m + Cb) / Vmax_m
-                    return jnp.where(valid, Cm_c - Cm_calc, jnp.nan)
-
-                upper = Cg0m * (1.0 - 1e-9)
-                Cm = bracketed_bisection(equation, eps, upper)
-                cm_valid = ~jnp.isnan(Cm)
-                S = tmb * (1.0 - (Cm / Cg0m) ** n_freundlich)
-                Cb = jnp.where(
-                    cm_valid, (CUE * I) / (kb * (1.0 - CUE * S)), Cg0b
-                )
-                return Cb, Cm
-
-            return Cg0b, Cg0m
 
         def solve_cm_rmm_density():
             if sat == "no":
@@ -407,11 +305,7 @@ def analytical_steady_state(
                 )
                 return jnp.where(valid_base, Cm_c - Cm_calc, jnp.nan)
 
-            upper = (
-                Cg0m * (1.0 - 1e-9)
-                if sat in ("Langmuir", "freundlich")
-                else jnp.maximum(10.0 * Km_m, 1.0)
-            )
+            upper = (Cg0m * (1.0 - 1e-9) if sat == "Langmuir" else jnp.maximum(10.0 * Km_m, 1.0))
             Cm = bracketed_bisection(equation, eps, upper)
             cm_valid = ~jnp.isnan(Cm)
             S = sat_value(Cm)
@@ -428,45 +322,12 @@ def analytical_steady_state(
             Cm_star = Cg0m
 
         valid_cb = (Cb_star > 0) & ~jnp.isnan(Cb_star)
-        Cp_star = jnp.where(
-            valid_cb, I * (Km_p + Cb_star) / (Vmax_p * Cb_star), Cg0b
-        )
+        Cp_star = jnp.where(valid_cb, I * (Km_p + Cb_star) / (Vmax_p * Cb_star), Cg0b)
 
     return jnp.array([Cp_star, Cb_star, Cm_star])
 
-
-
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LinearRegression, QuantileRegressor, ElasticNet, BayesianRidge, Ridge, TweedieRegressor, Lasso
-from sklearn.cross_decomposition import PLSRegression
-from sklearn.neural_network import MLPRegressor
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor
-from sklearn.svm import SVR
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.preprocessing import SplineTransformer, PolynomialFeatures
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
-from catboost import CatBoostRegressor
-
-
 def get_models(seed=4210):
-    """
-    Initialize and return the MODELS dictionary.
-    
-    Parameters
-    ----------
-    seed : int, default=4210
-        Random seed for reproducibility.
-    
-    Returns
-    -------
-    dict
-        Dictionary of model configurations.
-    """
     MODELS = {
-        # ============================== Fast ==============================
         'LinReg': {
             'model': LinearRegression(),
             'params': {},

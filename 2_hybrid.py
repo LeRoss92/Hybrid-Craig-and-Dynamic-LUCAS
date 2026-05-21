@@ -25,64 +25,6 @@ TARGET_LABELS = {
     "SOC,MAOCi,MICi": ["SOC", "MAOCi", "MICi"],
 }
 
-def log_and_stocks(df):
-    helper_df = df.copy()
-    for col in log_cols:
-        helper_df[col] = np.log1p(helper_df[col])
-    maoc_cols = [
-        "pred_MAOC_median_LinReg_inf_MAOC_index_2009",
-        "pred_MAOC_median_LinReg_inf_MAOC_index_2015",
-        "pred_MAOC_median_LinReg_inf_MAOC_index_2018",
-    ]
-    mic_cols = [
-        "pred_MIC_median_LinReg_inf_Cmic_index_2009",
-        "pred_MIC_median_LinReg_inf_Cmic_index_2015",
-        "pred_MIC_median_LinReg_inf_Cmic_index_2018",
-    ]
-    r_maoc_avg = helper_df[maoc_cols].mean(axis=1)
-    r_mic_avg = helper_df[mic_cols].mean(axis=1)
-    helper_df["y_avg_C"] = helper_df["OC_avg_09_15_18"]
-    helper_df["y_avg_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y_avg_C"]
-    helper_df["y_avg_Cb"] = r_mic_avg * helper_df["y_avg_C"]
-    helper_df["y_avg_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y_avg_C"]
-    helper_df["y2009_C"] = helper_df["OC_avg_09_15_18"] - helper_df["SOC_linreg_slope"] * 4.5
-    helper_df["y2018_C"] = helper_df["OC_avg_09_15_18"] + helper_df["SOC_linreg_slope"] * 4.5
-    helper_df["y2009_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y2009_C"]
-    helper_df["y2009_Cb"] = r_mic_avg * helper_df["y2009_C"]
-    helper_df["y2009_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y2009_C"]
-    helper_df["y2018_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y2018_C"]
-    helper_df["y2018_Cb"] = r_mic_avg * helper_df["y2018_C"]
-    helper_df["y2018_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y2018_C"]
-    helper_df["input_avg_09_15_18"] = helper_df[["input_2009", "input_2015", "input_2018"]].mean(axis=1)
-    return helper_df
-
-def observed_derived_targets(helper_df, temp, use_dynamic, targets_arg):
-    ta = targets_arg
-    if use_dynamic:
-        y0 = helper_df[["y2009_Cp", "y2009_Cb", "y2009_Cm"]].to_numpy()
-        y1 = helper_df[["y2018_Cp", "y2018_Cb", "y2018_Cm"]].to_numpy()
-        d = y1 - y0
-        soc_sum = np.sum(d, axis=1, keepdims=True)
-        # MICi / MAOCi: pool deltas (Cb, Cm), same units as SOC delta
-        mic_extra = d[:, 1:2]
-        maoc_extra = d[:, 2:3]
-    else:
-        cols = ["y_avg_Cp", "y_avg_Cb", "y_avg_Cm"]
-        pools = helper_df[cols].to_numpy()
-        soc_sum = np.sum(pools, axis=1, keepdims=True)
-        soc_lvl = np.sum(pools, axis=1, keepdims=True) + 1e-12
-        mic_extra = pools[:, 1:2] / soc_lvl
-        maoc_extra = pools[:, 2:3] / soc_lvl
-    if ta == "SOC":
-        return jnp.asarray(soc_sum)
-    if ta == "SOC,MICi":
-        return jnp.asarray(np.concatenate([soc_sum, mic_extra], axis=1))
-    if ta == "SOC,MAOCi":
-        return jnp.asarray(np.concatenate([soc_sum, maoc_extra], axis=1))
-    if ta == "SOC,MAOCi,MICi":
-        return jnp.asarray(np.concatenate([soc_sum, maoc_extra, mic_extra], axis=1))
-    raise KeyError(ta)
-
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--temp"); parser.add_argument("--fold"); parser.add_argument("--md"); parser.add_argument("--mt"); parser.add_argument("--sat"); parser.add_argument("--targets"); args = parser.parse_args()
     start_time = time.perf_counter()
@@ -129,7 +71,36 @@ def main():
 
         # preprocess: get data, log some features & calculate stocks, get split indices, impute, create targets, normalize
         df = pd.read_pickle("1_preprocessed.pkl") # get data
-        helper_df = log_and_stocks(df) # log specified variables and calculate stocks
+
+        helper_df = df.copy()
+        for col in log_cols:
+            helper_df[col] = np.log1p(helper_df[col])
+        maoc_cols = [
+            "pred_MAOC_median_LinReg_inf_MAOC_index_2009",
+            "pred_MAOC_median_LinReg_inf_MAOC_index_2015",
+            "pred_MAOC_median_LinReg_inf_MAOC_index_2018",
+        ]
+        mic_cols = [
+            "pred_MIC_median_LinReg_inf_Cmic_index_2009",
+            "pred_MIC_median_LinReg_inf_Cmic_index_2015",
+            "pred_MIC_median_LinReg_inf_Cmic_index_2018",
+        ]
+        r_maoc_avg = helper_df[maoc_cols].mean(axis=1)
+        r_mic_avg = helper_df[mic_cols].mean(axis=1)
+        helper_df["y_avg_C"] = helper_df["OC_avg_09_15_18"]
+        helper_df["y_avg_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y_avg_C"]
+        helper_df["y_avg_Cb"] = r_mic_avg * helper_df["y_avg_C"]
+        helper_df["y_avg_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y_avg_C"]
+        helper_df["y2009_C"] = helper_df["OC_avg_09_15_18"] - helper_df["SOC_linreg_slope"] * 4.5
+        helper_df["y2018_C"] = helper_df["OC_avg_09_15_18"] + helper_df["SOC_linreg_slope"] * 4.5
+        helper_df["y2009_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y2009_C"]
+        helper_df["y2009_Cb"] = r_mic_avg * helper_df["y2009_C"]
+        helper_df["y2009_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y2009_C"]
+        helper_df["y2018_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y2018_C"]
+        helper_df["y2018_Cb"] = r_mic_avg * helper_df["y2018_C"]
+        helper_df["y2018_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y2018_C"]
+        helper_df["input_avg_09_15_18"] = helper_df[["input_2009", "input_2015", "input_2018"]].mean(axis=1)
+
         if use_dynamic:
             predictors = predictors_dynamic
         else:
@@ -146,7 +117,32 @@ def main():
         train_idx = np.where((split_col != "test") & (split_col != str(args.fold)))[0] # train on all folds ecxept validation fold (and also not test)
         val_idx = np.where(split_col == str(args.fold))[0] # validation indices
         helper_df = helper_df.fillna(helper_df.iloc[jax.device_get(train_idx)].median(numeric_only=True)) # impute empty with median
-        targets = observed_derived_targets(helper_df, args.temp, use_dynamic, args.targets)
+
+        ta = args.targets
+        if use_dynamic:
+            y0 = helper_df[["y2009_Cp", "y2009_Cb", "y2009_Cm"]].to_numpy()
+            y1 = helper_df[["y2018_Cp", "y2018_Cb", "y2018_Cm"]].to_numpy()
+            d = y1 - y0
+            soc_sum = np.sum(d, axis=1, keepdims=True)
+            # MICi / MAOCi: pool deltas (Cb, Cm), same units as SOC delta
+            mic_extra = d[:, 1:2]
+            maoc_extra = d[:, 2:3]
+        else:
+            cols = ["y_avg_Cp", "y_avg_Cb", "y_avg_Cm"]
+            pools = helper_df[cols].to_numpy()
+            soc_sum = np.sum(pools, axis=1, keepdims=True)
+            soc_lvl = np.sum(pools, axis=1, keepdims=True) + 1e-12
+            mic_extra = pools[:, 1:2] / soc_lvl
+            maoc_extra = pools[:, 2:3] / soc_lvl
+        if ta == "SOC":
+            targets =  jnp.asarray(soc_sum)
+        if ta == "SOC,MICi":
+            targets =  jnp.asarray(np.concatenate([soc_sum, mic_extra], axis=1))
+        if ta == "SOC,MAOCi":
+            targets =  jnp.asarray(np.concatenate([soc_sum, maoc_extra], axis=1))
+        if ta == "SOC,MAOCi,MICi":
+            targets =  jnp.asarray(np.concatenate([soc_sum, maoc_extra, mic_extra], axis=1))
+
         # split 
         x_features = jnp.asarray(helper_df[predictors].to_numpy()) # df to np
         npp_I_all = jnp.asarray(helper_df[npp_col].to_numpy())
