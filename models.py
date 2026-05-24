@@ -343,12 +343,9 @@ def get_models(seed=4210):
                 'spline__degree': [1],                       # linear vs polynomial splines
                 'spline__include_bias': [False],                # True: x=y=0
                 'interactions__degree': [2],    # 2            # 1: no interactions, 2: pairwise...
-                'ridge__alpha': [0.01],       #  0.001, 0.5          # 1e-6: minimal regularization for numerical stability
-            },
-            'n_jobs': 32,  # Use workers for GridSearchCV (when not parallelizing candidates)
-            'n_jobs_feature_selection': 32  # Parallelize candidate feature evaluation (one candidate per worker)
+                'ridge__alpha': [0.01]},       #  0.001, 0.5          # 1e-6: minimal regularization for numerical stability
         },
-        'XGB': {
+        'XGB-n': {
             'model': XGBRegressor(
                 n_estimators=50,
                 learning_rate=0.1,
@@ -359,18 +356,39 @@ def get_models(seed=4210):
                 device="cpu",
                 n_jobs=1,
                 verbosity=0,
-                random_state=seed
-            ),
-            'n_jobs': 1,
+                random_state=seed),
             'params': {
                 'n_estimators': [150],
                 'max_depth': [5],
                 'learning_rate': [0.05],
                 'subsample': [0.8],
                 'colsample_bytree': [0.8], # 0.5
-                'min_child_weight': [1] # , 5
-            },
-            'n_jobs_feature_selection': 5
+                'min_child_weight': [5], # , 5
+                'reg_alpha': [0.5],
+                },
+        },
+        'XGB-1': {
+            'model': XGBRegressor(
+                n_estimators=50,
+                learning_rate=0.1,
+                max_depth=6,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                tree_method='hist',
+                device="cpu",
+                n_jobs=1,
+                verbosity=0,
+                random_state=seed),
+            'params': {
+                'n_estimators': [150],
+                'max_depth': [1],
+                'learning_rate': [0.05],
+                'subsample': [0.8],
+                'colsample_bytree': [0.8], # 0.5
+                'min_child_weight': [5], # , 5
+                # 'reg_lambda': [1.0, 5.0, 10.0],
+                'reg_alpha': [0.5],
+                },
         },
     }
     return MODELS
