@@ -469,7 +469,7 @@ TARGET_CONFIG = {
 
 use_model = {
     # 'BD': 'LinReg',
-    'MAOC': 'LinReg',
+    'MAOC': 'XGB-1',
     'MIC': 'XGB-1',
     # 'dSOC_15_18': 'XGB',
     'dSOC_09_18': 'XGB-n',
