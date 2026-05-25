@@ -42,6 +42,28 @@ pred_groups = {
     },
     'doy change': ["doy_linreg_slope"],
     'doy avg': ["doy_avg_09_15_18"],
+    'Management': {
+        2009: ['tree_height_survey_2009', 
+                'grazing_2009', 
+                'wm_2009', 
+                'soil_stones_perc_2009', 
+                'soil_crop_2009'
+                ],
+        2015: ['tree_height_survey_2015', 
+                'grazing_2015', 
+                'wm_2015', 
+                'soil_stones_perc_2015', 
+                'soil_crop_2015'
+                ],
+        2018: ['tree_height_survey_2018', 
+                'grazing_2018', 
+                'wm_2018', 
+                'soil_stones_perc_2018', 
+                'soil_crop_2018'
+                ]
+        },
+    'Management change': [x + '_linreg_slope' for x in ['tree_height_survey', 'grazing', 'wm', 'soil_stones_perc', 'soil_crop']],
+    'Management avg': [x + '_avg_09_15_18' for x in ['tree_height_survey', 'grazing', 'wm', 'soil_stones_perc', 'soil_crop']],
     'Fluxcom_era5l': {
         2009: ['Fluxcom_H_2009-5_mean',
                 'Fluxcom_LE_2009-5_mean', 
@@ -82,6 +104,7 @@ TARGET_CONFIG = {
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['LUCAS normal'][2009]
             + pred_groups['Fluxcom_era5l'][2009]
+            + pred_groups['Management'][2009]
             + pred_groups['NPP'][2009]
             + pred_groups['doy'][2009]
        
@@ -97,6 +120,7 @@ TARGET_CONFIG = {
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2015]
                     + pred_groups['Fluxcom_era5l'][2015]
+                    + pred_groups['Management'][2015]
                     + pred_groups['NPP'][2015]
                     + pred_groups['doy'][2015]
                 ),
@@ -111,6 +135,7 @@ TARGET_CONFIG = {
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2018]
                     + pred_groups['Fluxcom_era5l'][2018]
+                    + pred_groups['Management'][2018]
                     + pred_groups['NPP'][2018]
                     # + pred_groups['WorldClim'][2018]
                     # + pred_groups['AlphaEarth 2017+2018'][2018]
@@ -127,6 +152,7 @@ TARGET_CONFIG = {
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2009]
                     + pred_groups['Fluxcom_era5l'][2009]
+                    + pred_groups['Management'][2009]
                     + pred_groups['NPP'][2009]
                     # + pred_groups['WorldClim'][2009]
                     # + pred_groups['AlphaEarth 2017+2018'][2009]
@@ -145,6 +171,7 @@ TARGET_CONFIG = {
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['LUCAS normal'][2018]
             + pred_groups['Fluxcom_era5l'][2018]
+            + pred_groups['Management'][2018]
             + pred_groups['NPP'][2018]
             # + pred_groups['WorldClim'][2018]
             # + pred_groups['AlphaEarth 2017+2018'][2018]
@@ -161,6 +188,7 @@ TARGET_CONFIG = {
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2015]
                     + pred_groups['Fluxcom_era5l'][2015]
+                    + pred_groups['Management'][2015]
                     + pred_groups['NPP'][2015]
                     # + pred_groups['WorldClim'][2015]
                     # + pred_groups['AlphaEarth 2017+2018'][2015]
@@ -177,6 +205,7 @@ TARGET_CONFIG = {
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2018]
                     + pred_groups['Fluxcom_era5l'][2018]
+                    + pred_groups['Management'][2018]
                     + pred_groups['NPP'][2018]
                     # + pred_groups['WorldClim'][2018]
                     # + pred_groups['AlphaEarth 2017+2018'][2018]
@@ -193,6 +222,7 @@ TARGET_CONFIG = {
                     + pred_groups['Ox. ex. Al/Fe']
                     + pred_groups['LUCAS normal'][2009]
                     + pred_groups['Fluxcom_era5l'][2009]
+                    + pred_groups['Management'][2009]
                     + pred_groups['NPP'][2009]
                     # + pred_groups['WorldClim'][2009]
                     # + pred_groups['AlphaEarth 2017+2018'][2009]
@@ -398,6 +428,8 @@ TARGET_CONFIG = {
             + pred_groups['LUCAS normal avg']
             + pred_groups['Fluxcom_era5l change']
             + pred_groups['Fluxcom_era5l avg']
+            + pred_groups['Management change']
+            + pred_groups['Management avg']
             + pred_groups['NPP change']
             + pred_groups['NPP avg']
             # + pred_groups['WorldClim'][2015]
@@ -418,6 +450,7 @@ TARGET_CONFIG = {
             + pred_groups['Mineral Activity'][2015]
             + pred_groups['Ox. ex. Al/Fe']
             + pred_groups['Fluxcom_era5l avg']
+            + pred_groups['Management avg']
             + pred_groups['NPP avg']
             # + pred_groups['WorldClim'][2015]
             # + pred_groups['AlphaEarth 2017+2018'][2015]
