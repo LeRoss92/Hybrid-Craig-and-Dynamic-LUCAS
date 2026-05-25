@@ -71,17 +71,17 @@ pred_groups = {
                 'era5_land_tp_2009-5_mean', 
                 'era5_land_hpet_2009-5_mean', 
                 ],
-        2015: ['Fluxcom_H_2009-5_mean',
-                'Fluxcom_LE_2009-5_mean', 
-                'era5_land_t2m_2009-5_mean', 
-                'era5_land_tp_2009-5_mean', 
-                'era5_land_hpet_2009-5_mean', 
+        2015: ['Fluxcom_H_2015-5_mean',
+                'Fluxcom_LE_2015-5_mean', 
+                'era5_land_t2m_2015-5_mean', 
+                'era5_land_tp_2015-5_mean', 
+                'era5_land_hpet_2015-5_mean', 
                 ],
-        2018: ['Fluxcom_H_2009-5_mean',
-                'Fluxcom_LE_2009-5_mean', 
-                'era5_land_t2m_2009-5_mean', 
-                'era5_land_tp_2009-5_mean', 
-                'era5_land_hpet_2009-5_mean', 
+        2018: ['Fluxcom_H_2018-5_mean',
+                'Fluxcom_LE_2018-5_mean', 
+                'era5_land_t2m_2018-5_mean', 
+                'era5_land_tp_2018-5_mean', 
+                'era5_land_hpet_2018-5_mean', 
                 ]},
     'Fluxcom_era5l change': [x + '_linreg_slope' for x in ['Fluxcom_H', 'Fluxcom_LE', 'era5_land_t2m', 'era5_land_tp', 'era5_land_hpet']],
     'Fluxcom_era5l avg': [x + '_avg_09_15_18' for x in ['Fluxcom_H', 'Fluxcom_LE', 'era5_land_t2m', 'era5_land_tp', 'era5_land_hpet']],
@@ -106,9 +106,7 @@ TARGET_CONFIG = {
             + pred_groups['Fluxcom_era5l'][2009]
             + pred_groups['Management'][2009]
             + pred_groups['NPP'][2009]
-            + pred_groups['doy'][2009]
-       
-        ),
+            + pred_groups['doy'][2009]),
         "log_predictors": pred_groups['OC (log)'][2009] + pred_groups['LUCAS log'][2009],
         "categoricals": ['lc1_2_2009'], # , 'lc1_2009' 'Soil_Group', 
         "inference": [
@@ -162,6 +160,7 @@ TARGET_CONFIG = {
                 "categoricals": ['lc1_2_2009'], # , 'lc1_2009' 'Soil_Group', 
             },
         ],
+        "selected_predictors": ["Clay", "Silt", "OC_2009", "era5_land_hpet_2009-5_mean", "Ox_Al_2018"]
     },
     "MIC": {
         "target_name": "Cmic_index_2018",
@@ -232,6 +231,7 @@ TARGET_CONFIG = {
                 "categoricals": ['lc1_2_2009'], #, 'lc1_2009' 'Soil_Group', 
             },
         ],
+        "selected_predictors": ["doy_2018", "Clay", "pH_2018", "era5_land_t2m_2018-5_mean", "era5_land_tp_2018-5_mean"]
     },
     # "SOC09": {
     #     "target_name": "OC_2009",
@@ -442,6 +442,7 @@ TARGET_CONFIG = {
         "inference": [
             {"target_name": "SOC_linreg_slope"},  # same as training: no predictors/log_predictors override
         ],
+        "selected_predictors": ["Clay", "Silt", "OC_avg_09_15_18", "N_avg_09_15_18", "era5_land_hpet_avg_09_15_18"]
     },
     "SOC_avg": {
         "target_name": "OC_avg_09_15_18",
@@ -462,6 +463,11 @@ TARGET_CONFIG = {
         "inference": [
             {"target_name": "SOC_linreg_slope"},  # same as training: no predictors/log_predictors override
         ],
+        "selected_predictors": ["Clay", "Silt", "Coarse", 
+                                "era5_land_hpet_avg_09_15_18", "era5_land_t2m_avg_09_15_18", "era5_land_tp_avg_09_15_18",
+                                "MODIS_NPP_avg_09_15_18",
+                                "lc1_2_2018_C", "lc1_2_2018_B",
+                                'grazing_avg_09_15_18', 'soil_stones_perc_avg_09_15_18']
     },
     # "tau": {
     #     "target_name": "tau",
@@ -499,6 +505,8 @@ TARGET_CONFIG = {
     #     ],
     # },
 }
+
+
 
 use_model = {
     # 'BD': 'LinReg',
