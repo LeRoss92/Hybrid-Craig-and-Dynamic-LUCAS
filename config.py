@@ -4,7 +4,7 @@ pred_groups = {
         'color': '#f5f5dc',  # Beige
         'average': {
             'Clay': 'Clay',
-            'Silt': 'Silt', 
+            'Clay+Silt': 'ClaySilt', 
             'Coarse': 'Coarse', 
             'Stones': 'soil_stones_perc_avg_09_15_18',
         },
@@ -21,55 +21,73 @@ pred_groups = {
             'Stones': 'soil_stones_perc_linreg_slope',
         },
     },
+    'Bulk Density': {
+        'color': '#f5f5dc',  # Beige
+        '2018': {
+            'Bulk Density': 'BD 0-20_2018',
+        },
+    },
     'Mineralogy': {
         'color': 'grey',
         'average': {
             'Al': 'Ox_Al_2018', 
-            'Fe': 'Ox_Fe_2018',
-            'Clay activity': 'HALA_2015gps_topsoil',
+            'Fe': 'Ox_Fe_2018'
         },
     },
-    'LUCAS': {
-        'color': 'orange',
+    'Nutrients': {
+        'color': 'purple',
         '2009': {
-            'pH calc.': 'pH_c_2009',
-            'pH.': 'pH_2009',
             'CN': 'CN_2009', 
             'CP': 'CP_2009', 
             'CK': 'CK_2009', 
-            'CaCO3': 'CaCO3_c_2009',
         },
         '2015': {
-            'pH calc.': 'pH_c_2015',
-            'pH.': 'pH_2015',
             'CN': 'CN_2015', 
             'CP': 'CP_2015', 
             'CK': 'CK_2015', 
-            'CaCO3': 'CaCO3_c_2015',
         },
         '2018': {
-            'pH calc.': 'pH_c_2018',
-            'pH.': 'pH_2018',
             'CN': 'CN_2018', 
             'CP': 'CP_2018', 
             'CK': 'CK_2018', 
-            'CaCO3': 'CaCO3_c_2018',
         },
         'average': {
-            'pH calc.': 'pH_c_avg_09_15_18',
-            'pH.': 'pH_avg_09_15_18',
             'CN': 'CN_avg_09_15_18', 
             'CP': 'CP_avg_09_15_18', 
             'CK': 'CK_avg_09_15_18', 
-            'CaCO3': 'CaCO3_c_avg_09_15_18',
         },
         'change': {
-            'pH calc.': 'pH_c_linreg_slope',
-            'pH.': 'pH_linreg_slope',
             'CN': 'CN_linreg_slope', 
             'CP': 'CP_linreg_slope', 
             'CK': 'CK_linreg_slope', 
-            'CaCO3': 'CaCO3_c_linreg_slope',
+        },
+    },
+    'Acidity': {
+        'color': 'orange',
+        '2009': {
+            'pH CaCl2': 'pH_CaCl2_2009',
+            'pH H2O': 'pH_H2O_2009',
+            'CaCO3': 'CaCO3_2009',
+        },
+        '2015': {
+            'pH CaCl2': 'pH_CaCl2_2015',
+            'pH H2O': 'pH_H2O_2015',
+            'CaCO3': 'CaCO3_2015',
+        },
+        '2018': {
+            'pH CaCl2': 'pH_CaCl2_2018',
+            'pH H2O': 'pH_H2O_2018',
+            'CaCO3': 'CaCO3_2018',
+        },
+        'average': {
+            'pH CaCl2': 'pH_CaCl2_avg_09_15_18',
+            'pH H2O': 'pH_H2O_avg_09_15_18',
+            'CaCO3': 'CaCO3_avg_09_15_18',
+        },
+        'change': {
+            'pH CaCl2': 'pH_CaCl2_linreg_slope',
+            'pH H2O': 'pH_H2O_linreg_slope',
+            'CaCO3': 'CaCO3_linreg_slope',
         },
     },
     'SOC': {
@@ -114,8 +132,6 @@ pred_groups = {
             'Grassland': 'lc1_2_2009_E',
             'Cropland': 'lc1_2_2009_B',
             'Woodland': 'lc1_2_2009_C',
-            'Shrubland': 'lc1_2_2009_D',
-            'Bare Land': 'lc1_2_2009_F',
             'Grazing': 'grazing_2009',
             'Irrigation': 'wm_2009',
             # 'Residues': 'soil_crop_2009', # too sparse
@@ -125,8 +141,6 @@ pred_groups = {
             'Grassland': 'lc1_2_2015_E',
             'Cropland': 'lc1_2_2015_B',
             'Woodland': 'lc1_2_2015_C',
-            'Shrubland': 'lc1_2_2015_D',
-            'Bare Land': 'lc1_2_2015_F',
             'Grazing': 'grazing_2015',
             'Irrigation': 'wm_2015',
             # 'Residues': 'soil_crop_2015',
@@ -136,8 +150,6 @@ pred_groups = {
             'Grassland': 'lc1_2_2015_E',
             'Cropland': 'lc1_2_2015_B',
             'Woodland': 'lc1_2_2015_C',
-            'Shrubland': 'lc1_2_2015_D',
-            'Bare Land': 'lc1_2_2015_F',
             'Grazing': 'grazing_2018',
             'Irrigation': 'wm_2018',
             # 'Residues': 'soil_crop_2018',
@@ -147,8 +159,6 @@ pred_groups = {
             'Grassland': 'E_avg_09_15_18',
             'Cropland': 'B_avg_09_15_18',
             'Woodland': 'C_avg_09_15_18',
-            'Shrubland': 'D_avg_09_15_18',
-            'Bare Land': 'F_avg_09_15_18',
             'Grazing': 'grazing_avg_09_15_18',
             'Irrigation': 'wm_avg_09_15_18',
             'Residues': 'soil_crop_avg_09_15_18',
@@ -158,8 +168,6 @@ pred_groups = {
             'Grassland': 'E_linreg_slope',
             'Cropland': 'B_linreg_slope',
             'Woodland': 'C_linreg_slope',
-            'Shrubland': 'D_linreg_slope',
-            'Bare Land': 'F_linreg_slope',
             'Grazing': 'grazing_linreg_slope',
             'Irrigation': 'wm_linreg_slope',
             'Residues': 'soil_crop_linreg_slope',
@@ -174,6 +182,7 @@ pred_groups = {
             'T': 'era5_land_t2m_2009-5_mean',
             'P': 'era5_land_tp_2009-5_mean',
             'PET': 'era5_land_hpet_2009-5_mean',
+            'AI': 'aridity_index_2009-5_mean',
         },
         '2015': {
             'H': 'Fluxcom_H_2015-5_mean',
@@ -181,6 +190,7 @@ pred_groups = {
             'T': 'era5_land_t2m_2015-5_mean',
             'P': 'era5_land_tp_2015-5_mean',
             'PET': 'era5_land_hpet_2015-5_mean',
+            'AI': 'aridity_index_2015-5_mean',
         },
         '2018': {
             'H': 'Fluxcom_H_2018-5_mean',
@@ -188,6 +198,7 @@ pred_groups = {
             'T': 'era5_land_t2m_2018-5_mean',
             'P': 'era5_land_tp_2018-5_mean',
             'PET': 'era5_land_hpet_2018-5_mean',
+            'AI': 'aridity_index_2018-5_mean',
         },
         'average': {
             'H': 'Fluxcom_H_avg_09_15_18',
@@ -195,6 +206,7 @@ pred_groups = {
             'T': 'era5_land_t2m_avg_09_15_18',
             'P': 'era5_land_tp_avg_09_15_18',
             'PET': 'era5_land_hpet_avg_09_15_18',
+            'AI': 'aridity_index_avg_09_15_18',
         },
         'change': {
             'H': 'Fluxcom_H_linreg_slope',
@@ -202,6 +214,7 @@ pred_groups = {
             'T': 'era5_land_t2m_linreg_slope',
             'P': 'era5_land_tp_linreg_slope',
             'PET': 'era5_land_hpet_linreg_slope',
+            'AI': 'aridity_index_linreg_slope',
         },
     },
     'NPP': {
@@ -223,7 +236,9 @@ pred_groups = {
         },
     },
 }
-to_log = ['CN', 'CP', 'CK', 'CaCO3', 'SOC']
+to_log = ['CN', 'SOC', 'Clay', 'Coarse', 'Stones', 'Al', 'Fe']
+to_2log = ['CP', 'CK', 'CaCO3']
+to_3log = []
 
 # Single dict: targets at first level. Per target: predictors, log_predictors, categoricals, inference.
 # inference = list of {target_name, predictors, log_predictors, categoricals} - each item is a full pred_config
@@ -233,8 +248,10 @@ TARGET_CONFIG = {
         "predictor_groups": [
             ("Texture", "average"),
             ("Texture", "2009"),
+            ("Bulk Density", "2018"),
             ("Mineralogy", "average"),
-            ("LUCAS", "2009"),
+            ("Nutrients", "2009"),
+            ("Acidity", "2009"),
             ("SOC", "2009"),
             ("Season", "2009"),
             ("LC", "2009"),
@@ -249,8 +266,10 @@ TARGET_CONFIG = {
         "predictor_groups": [
             ("Texture", "average"),
             ("Texture", "2018"),
+            ("Bulk Density", "2018"),
             ("Mineralogy", "average"),
-            ("LUCAS", "2018"),
+            ("Nutrients", "2018"),
+            ("Acidity", "2018"),
             ("SOC", "2018"),
             ("Season", "2018"),
             ("LC", "2018"),
@@ -258,49 +277,53 @@ TARGET_CONFIG = {
             ("NPP", "2018"),
             ],
         # "selected_predictors": ["doy_2018", "Clay", "pH_2018", "era5_land_t2m_2018-5_mean", "era5_land_tp_2018-5_mean"]
-        "selected_predictors": ["CN_2018", "CK_2018", "pH_2018", "era5_land_t2m_2018-5_mean", "Clay", "OC_2018"]
+        "selected_predictors": ["CN_2018", "CK_2018", "pH_H2O_2018", "era5_land_t2m_2018-5_mean", "Clay", "OC_2018"]
     },
-    "dSOC": {
-        "target_name": "OC_linreg_slope",
-        "predictor_groups": [
-            ("Texture", "average"),
-            ("Texture", "change"),
-            ("Mineralogy", "average"),
-            ("LUCAS", "average"),
-            ("SOC", "average"),
-            ("Season", "average"),
-            ("Season", "change"),
-            ("LC", "average"),
-            ("LC", "change"),
-            ("Atmosphere", "average"),
-            ("Atmosphere", "change"),
-            ("NPP", "average"),
-            ("NPP", "change"),
-            ],
-        # "selected_predictors": ["Clay", "Silt", "OC_avg_09_15_18", "CN_avg_09_15_18", "era5_land_hpet_avg_09_15_18"],
-        "selected_predictors": ["Clay", "Silt", "OC_avg_09_15_18", "CP_avg_09_15_18", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_linreg_slope"]
-    },
-    "SOC": {"target_name": "OC_avg_09_15_18",
-        "predictor_groups": [
-            ("Texture", "average"),
-            ("Texture", "change"),
-            ("Mineralogy", "average"),
-            ("Season", "average"),
-            ("Season", "change"),
-            ("LC", "average"),
-            ("Atmosphere", "average"),
-            ("NPP", "average"),
-            ],
-        # "selected_predictors": ["Clay", "Silt", "Coarse", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_avg_09_15_18", "era5_land_tp_avg_09_15_18", "MODIS_NPP_avg_09_15_18", "lc1_2_2018_C", "lc1_2_2018_B", 'grazing_avg_09_15_18', 'soil_stones_perc_avg_09_15_18']
-        "selected_predictors": ["Clay", "Silt", "Coarse", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_avg_09_15_18", "era5_land_tp_avg_09_15_18", "MODIS_NPP_avg_09_15_18", "B_avg_09_15_18", "E_avg_09_15_18"]
-    }
+    # "dSOC": {
+    #     "target_name": "OC_linreg_slope",
+    #     "predictor_groups": [
+    #         ("Texture", "average"),
+    #         ("Texture", "change"),
+    #         ("Bulk Density", "2018"),
+    #         ("Mineralogy", "average"),
+    #         ("Nutrients", "average"),
+    #         ("Acidity", "average"),
+    #         ("SOC", "average"),
+    #         ("Season", "average"),
+    #         ("Season", "change"),
+    #         ("LC", "average"),
+    #         ("LC", "change"),
+    #         ("Atmosphere", "average"),
+    #         ("Atmosphere", "change"),
+    #         ("NPP", "average"),
+    #         ("NPP", "change"),
+    #         ],
+    #     # "selected_predictors": ["Clay", "Silt", "OC_avg_09_15_18", "CN_avg_09_15_18", "era5_land_hpet_avg_09_15_18"],
+    #     "selected_predictors": ["Clay", "ClaySilt", "OC_avg_09_15_18", "CP_avg_09_15_18", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_linreg_slope"]
+    # },
+    # "SOC": {
+    #     "target_name": "OC_avg_09_15_18",
+    #     "predictor_groups": [
+    #         ("Texture", "average"),
+    #         ("Texture", "change"),
+    #         ("Mineralogy", "average"),
+    #         ("Nutrients", "average"),
+    #         ("Season", "average"),
+    #         ("Season", "change"),
+    #         ("LC", "average"),
+    #         ("Atmosphere", "average"),
+    #         ("NPP", "average"),
+    #         ],
+    #     # "selected_predictors": ["Clay", "Silt", "Coarse", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_avg_09_15_18", "era5_land_tp_avg_09_15_18", "MODIS_NPP_avg_09_15_18", "lc1_2_2018_C", "lc1_2_2018_B", 'grazing_avg_09_15_18', 'soil_stones_perc_avg_09_15_18']
+    #     "selected_predictors": ["Clay", "ClaySilt", "Coarse", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_avg_09_15_18", "era5_land_tp_avg_09_15_18", "MODIS_NPP_avg_09_15_18", "B_avg_09_15_18", "E_avg_09_15_18"]
+    # }
 }
 
 use_model = {
     'MAOCi': 'XGB-n',
     'MICi': 'XGB-n',
-    'dSOC': 'XGB-n',
-    'SOC': 'XGB-n',
+    # 'dSOC': 'XGB-n',
+    # 'SOC': 'XGB-n',
     # 'SOC09': 'XGB',
     # 'SOC15': 'XGB',
     # 'SOC18': 'XGB'
