@@ -236,9 +236,8 @@ pred_groups = {
         },
     },
 }
-to_log = ['CN', 'SOC', 'Clay', 'Coarse', 'Stones', 'Al', 'Fe']
+to_log = ['CN', 'Clay', 'Coarse', 'Stones', 'Al', 'Fe', 'SOC'] 
 to_2log = ['CP', 'CK', 'CaCO3']
-to_3log = []
 
 # Single dict: targets at first level. Per target: predictors, log_predictors, categoricals, inference.
 # inference = list of {target_name, predictors, log_predictors, categoricals} - each item is a full pred_config
@@ -258,8 +257,7 @@ TARGET_CONFIG = {
             ("Atmosphere", "2009"),
             ("NPP", "2009"),
             ],
-        # "selected_predictors": ["Clay", "Silt", "OC_2009", "era5_land_hpet_2009-5_mean", "Ox_Al_2018"]
-        "selected_predictors": ["CN_2009", "OC_2009", "Clay", "lc1_2_2009_B", "era5_land_hpet_2009-5_mean", "Ox_Al_2018"]
+        "selected_predictors": ["CN_2009", "lc1_2_2009_B", "OC_2009", "ClaySilt", "era5_land_hpet_2009-5_mean", "Ox_Al_2018"]
     },
     "MICi": {
         "target_name": "Cmic_index_2018",
@@ -276,54 +274,53 @@ TARGET_CONFIG = {
             ("Atmosphere", "2018"),
             ("NPP", "2018"),
             ],
-        # "selected_predictors": ["doy_2018", "Clay", "pH_2018", "era5_land_t2m_2018-5_mean", "era5_land_tp_2018-5_mean"]
-        "selected_predictors": ["CN_2018", "CK_2018", "pH_H2O_2018", "era5_land_t2m_2018-5_mean", "Clay", "OC_2018"]
+        "selected_predictors": ["CN_2018", "pH_CaCl2_2018", "era5_land_hpet_2018-5_mean", "ClaySilt", "OC_2018"]
     },
-    # "dSOC": {
-    #     "target_name": "OC_linreg_slope",
-    #     "predictor_groups": [
-    #         ("Texture", "average"),
-    #         ("Texture", "change"),
-    #         ("Bulk Density", "2018"),
-    #         ("Mineralogy", "average"),
-    #         ("Nutrients", "average"),
-    #         ("Acidity", "average"),
-    #         ("SOC", "average"),
-    #         ("Season", "average"),
-    #         ("Season", "change"),
-    #         ("LC", "average"),
-    #         ("LC", "change"),
-    #         ("Atmosphere", "average"),
-    #         ("Atmosphere", "change"),
-    #         ("NPP", "average"),
-    #         ("NPP", "change"),
-    #         ],
-    #     # "selected_predictors": ["Clay", "Silt", "OC_avg_09_15_18", "CN_avg_09_15_18", "era5_land_hpet_avg_09_15_18"],
-    #     "selected_predictors": ["Clay", "ClaySilt", "OC_avg_09_15_18", "CP_avg_09_15_18", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_linreg_slope"]
-    # },
-    # "SOC": {
-    #     "target_name": "OC_avg_09_15_18",
-    #     "predictor_groups": [
-    #         ("Texture", "average"),
-    #         ("Texture", "change"),
-    #         ("Mineralogy", "average"),
-    #         ("Nutrients", "average"),
-    #         ("Season", "average"),
-    #         ("Season", "change"),
-    #         ("LC", "average"),
-    #         ("Atmosphere", "average"),
-    #         ("NPP", "average"),
-    #         ],
-    #     # "selected_predictors": ["Clay", "Silt", "Coarse", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_avg_09_15_18", "era5_land_tp_avg_09_15_18", "MODIS_NPP_avg_09_15_18", "lc1_2_2018_C", "lc1_2_2018_B", 'grazing_avg_09_15_18', 'soil_stones_perc_avg_09_15_18']
-    #     "selected_predictors": ["Clay", "ClaySilt", "Coarse", "era5_land_hpet_avg_09_15_18", "era5_land_t2m_avg_09_15_18", "era5_land_tp_avg_09_15_18", "MODIS_NPP_avg_09_15_18", "B_avg_09_15_18", "E_avg_09_15_18"]
-    # }
+    "dSOC": {
+        "target_name": "OC_linreg_slope",
+        "predictor_groups": [
+            ("Texture", "average"),
+            ("Texture", "change"),
+            ("Bulk Density", "2018"),
+            ("Mineralogy", "average"),
+            ("Nutrients", "average"),
+            ("Nutrients", "change"),
+            ("Acidity", "average"),
+            ("Acidity", "change"),
+            ("SOC", "average"),
+            ("Season", "average"),
+            ("Season", "change"),
+            ("LC", "average"),
+            ("LC", "change"),
+            ("Atmosphere", "average"),
+            ("Atmosphere", "change"),
+            ("NPP", "average"),
+            ("NPP", "change"),
+            ],
+        "selected_predictors": ["CN_linreg_slope", "Clay", "ClaySilt", "CP_linreg_slope", "OC_avg_09_15_18", "pH_H2O_avg_09_15_18", "pH_CaCl2_avg_09_15_18", "era5_land_hpet_avg_09_15_18"]
+    },
+    "SOC": {
+        "target_name": "OC_avg_09_15_18",
+        "predictor_groups": [
+            ("Texture", "average"),
+            ("Bulk Density", "2018"),
+            ("Mineralogy", "average"),
+            ("Nutrients", "average"),
+            ("Acidity", "average"),
+            ("Season", "average"),
+            ("LC", "average"),
+            ("Atmosphere", "average"),
+            ("NPP", "average"),
+            ],
+        "selected_predictors": ["CP_avg_09_15_18", "CN_avg_09_15_18", "aridity_index_avg_09_15_18", "Clay", "ClaySilt", "pH_H2O_avg_09_15_18", "E_avg_09_15_18"]
+    }
 }
 
 use_model = {
     'MAOCi': 'XGB-n',
     'MICi': 'XGB-n',
-    # 'dSOC': 'XGB-n',
-    # 'SOC': 'XGB-n',
+    'dSOC': 'XGB-n',
+    'SOC': 'XGB-n',
     # 'SOC09': 'XGB',
     # 'SOC15': 'XGB',
     # 'SOC18': 'XGB'
