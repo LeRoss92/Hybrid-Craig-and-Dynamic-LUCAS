@@ -9,7 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from models import craig_BA_adapt, analytical_steady_state
-from config import default_param_ranges, predictors_dynamic, predictors_static, log_cols
+from config import default_param_ranges, TARGET_CONFIG
 from utils import vector_field, simulate_final_state, init_mlp, build_param_matrix, eval_loss, init_adam, eval_r2, train_step, pools_to_loss_targets
 
 
@@ -20,9 +20,9 @@ batch_size = 1024
 
 TARGET_LABELS = {
     "SOC": ["SOC"],
-    "SOC,MICi": ["SOC", "MICi"],
-    "SOC,MAOCi": ["SOC", "MAOCi"],
-    "SOC,MAOCi,MICi": ["SOC", "MAOCi", "MICi"],
+    "SOC,MIC": ["SOC", "MIC"],
+    "SOC,MAOC": ["SOC", "MAOC"],
+    "SOC,MAOC,MIC": ["SOC", "MAOC", "MIC"],
 }
 
 def main():
@@ -71,46 +71,29 @@ def main():
 
         # preprocess: get data, log some features & calculate stocks, get split indices, impute, create targets, normalize
         df = pd.read_pickle("1_preprocessed.pkl") # get data
-
+        targets = args.targets.split(',') # target(s)
+        predictors = []
+        for tar in targets:
+            for pred in TARGET_CONFIG[tar]['selected_predictors']:
+                if any(year in pred for year in ['2009', '2015', '2018']):
+                    if (pred.endswith('2009') or pred.endswith('2015') or pred.endswith('2018')) and pred != 'Ox_Al_2018':
+                        predictors.append(pred.replace('_2009', '_avg_09_15_18').replace('_2015', '_avg_09_15_18').replace('_2018', '_avg_09_15_18'))
+                    elif pred == 'Ox_Al_2018':
+                        predictors.append(pred)
+                    elif pred.startswith('lc1_2_'):
+                        predictors.append(pred[-1]+'_avg_09_15_18')
+                    elif '-5_mean' in pred:
+                        predictors.append(pred[:-12]+'_avg_09_15_18')
+                    else:
+                        raise ValueError(f'Not yet know what to do with: {pred}')                   
+                else:
+                    predictors.append(pred)
+        predictors = list(dict.fromkeys(predictors)) # Remove redundant predictors
         helper_df = df.copy()
-        for col in log_cols:
-            helper_df[col] = np.log1p(helper_df[col])
-        maoc_cols = [
-            "pred_MAOC_median_LinReg_inf_MAOC_index_2009",
-            "pred_MAOC_median_LinReg_inf_MAOC_index_2015",
-            "pred_MAOC_median_LinReg_inf_MAOC_index_2018",
-        ]
-        mic_cols = [
-            "pred_MIC_median_LinReg_inf_Cmic_index_2009",
-            "pred_MIC_median_LinReg_inf_Cmic_index_2015",
-            "pred_MIC_median_LinReg_inf_Cmic_index_2018",
-        ]
-        r_maoc_avg = helper_df[maoc_cols].mean(axis=1)
-        r_mic_avg = helper_df[mic_cols].mean(axis=1)
-        helper_df["y_avg_C"] = helper_df["OC_avg_09_15_18"]
-        helper_df["y_avg_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y_avg_C"]
-        helper_df["y_avg_Cb"] = r_mic_avg * helper_df["y_avg_C"]
-        helper_df["y_avg_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y_avg_C"]
-        helper_df["y2009_C"] = helper_df["OC_avg_09_15_18"] - helper_df["SOC_linreg_slope"] * 4.5
-        helper_df["y2018_C"] = helper_df["OC_avg_09_15_18"] + helper_df["SOC_linreg_slope"] * 4.5
-        helper_df["y2009_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y2009_C"]
-        helper_df["y2009_Cb"] = r_mic_avg * helper_df["y2009_C"]
-        helper_df["y2009_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y2009_C"]
-        helper_df["y2018_Cm"] = r_maoc_avg * (1 - r_mic_avg) * helper_df["y2018_C"]
-        helper_df["y2018_Cb"] = r_mic_avg * helper_df["y2018_C"]
-        helper_df["y2018_Cp"] = (1 - r_maoc_avg) * (1 - r_mic_avg) * helper_df["y2018_C"]
-        helper_df["input_avg_09_15_18"] = helper_df[["input_2009", "input_2015", "input_2018"]].mean(axis=1)
+        input_col = "input_avg_09_15_18"
+        helper_df = helper_df[["SOC", "POC", "MIC", "MAOC"]+predictors+[input_col, 'era5_land_t2m_avg_09_15_18', 'split']]
 
-        if use_dynamic:
-            predictors = predictors_dynamic
-        else:
-            predictors = predictors_static
-        npp_col = "input_avg_09_15_18"
-        npp_mask = (
-            helper_df[npp_col].notna()
-            & np.isfinite(helper_df[npp_col])
-            & (helper_df[npp_col] > 0)
-        ).to_numpy()
+        npp_mask = (helper_df[input_col].notna() & np.isfinite(helper_df[input_col]) & (helper_df[input_col] > 0)).to_numpy()
         original_idx = np.where(npp_mask)[0]
         helper_df = helper_df.loc[npp_mask].reset_index(drop=True)
         split_col = helper_df["split"].astype(str).to_numpy() # use same splits as in prediction
@@ -119,33 +102,20 @@ def main():
         helper_df = helper_df.fillna(helper_df.iloc[jax.device_get(train_idx)].median(numeric_only=True)) # impute empty with median
 
         ta = args.targets
-        if use_dynamic:
-            y0 = helper_df[["y2009_Cp", "y2009_Cb", "y2009_Cm"]].to_numpy()
-            y1 = helper_df[["y2018_Cp", "y2018_Cb", "y2018_Cm"]].to_numpy()
-            d = y1 - y0
-            soc_sum = np.sum(d, axis=1, keepdims=True)
-            # MICi / MAOCi: pool deltas (Cb, Cm), same units as SOC delta
-            mic_extra = d[:, 1:2]
-            maoc_extra = d[:, 2:3]
-        else:
-            cols = ["y_avg_Cp", "y_avg_Cb", "y_avg_Cm"]
-            pools = helper_df[cols].to_numpy()
-            soc_sum = np.sum(pools, axis=1, keepdims=True)
-            soc_lvl = np.sum(pools, axis=1, keepdims=True) + 1e-12
-            mic_extra = pools[:, 1:2] / soc_lvl
-            maoc_extra = pools[:, 2:3] / soc_lvl
         if ta == "SOC":
-            targets =  jnp.asarray(soc_sum)
-        if ta == "SOC,MICi":
-            targets =  jnp.asarray(np.concatenate([soc_sum, mic_extra], axis=1))
-        if ta == "SOC,MAOCi":
-            targets =  jnp.asarray(np.concatenate([soc_sum, maoc_extra], axis=1))
-        if ta == "SOC,MAOCi,MICi":
-            targets =  jnp.asarray(np.concatenate([soc_sum, maoc_extra, mic_extra], axis=1))
+            targets = jnp.asarray(helper_df["SOC"].to_numpy()).reshape(-1, 1)
+        if ta == "SOC,MIC":
+            targets = jnp.asarray(np.column_stack([ helper_df["SOC"].to_numpy(), helper_df["MIC"].to_numpy()]))
+        if ta == "SOC,MAOC":
+            targets = jnp.asarray(np.column_stack([ helper_df["SOC"].to_numpy(), helper_df["MAOC"].to_numpy()]))
+        if ta == "SOC,MAOC,MIC":
+            targets = jnp.asarray(np.column_stack([ helper_df["SOC"].to_numpy(), helper_df["MAOC"].to_numpy(), helper_df["MIC"].to_numpy()]))
+
+        # quit()
 
         # split 
         x_features = jnp.asarray(helper_df[predictors].to_numpy()) # df to np
-        npp_I_all = jnp.asarray(helper_df[npp_col].to_numpy())
+        npp_I_all = jnp.asarray(helper_df[input_col].to_numpy())
         x_train = x_features[train_idx]
         y_train = targets[train_idx]
         npp_I_train = npp_I_all[train_idx]
@@ -161,7 +131,7 @@ def main():
         target_mean = jnp.mean(y_train, axis=0)
         target_std = jnp.std(y_train, axis=0) + 1e-8
         # initial conditions (effectifly only used by dynamic)
-        y0_true = jnp.asarray(helper_df[["y2009_Cp", "y2009_Cb", "y2009_Cm"]].to_numpy()) 
+        y0_true = jnp.asarray(helper_df[["POC", "MIC", "MAOC"]].to_numpy()) 
         y0_train, y0_val = y0_true[train_idx], y0_true[val_idx]
 
         # initilize ML

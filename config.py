@@ -23,7 +23,7 @@ pred_groups = {
     },
     'Bulk Density': {
         'color': '#f5f5dc',  # Beige
-        '2018': {
+        'average': {
             'Bulk Density': 'BD 0-20_2018',
         },
     },
@@ -242,12 +242,12 @@ to_2log = ['CP', 'CK', 'CaCO3']
 # Single dict: targets at first level. Per target: predictors, log_predictors, categoricals, inference.
 # inference = list of {target_name, predictors, log_predictors, categoricals} - each item is a full pred_config
 TARGET_CONFIG = {
-    "MAOCi": {
+    "MAOC": {
         "target_name": "MAOC_index_2009",
         "predictor_groups": [
             ("Texture", "average"),
             ("Texture", "2009"),
-            ("Bulk Density", "2018"),
+            ("Bulk Density", "average"),
             ("Mineralogy", "average"),
             ("Nutrients", "2009"),
             ("Acidity", "2009"),
@@ -259,12 +259,12 @@ TARGET_CONFIG = {
             ],
         "selected_predictors": ["CN_2009", "lc1_2_2009_B", "OC_2009", "ClaySilt", "era5_land_hpet_2009-5_mean", "Ox_Al_2018"]
     },
-    "MICi": {
+    "MIC": {
         "target_name": "Cmic_index_2018",
         "predictor_groups": [
             ("Texture", "average"),
             ("Texture", "2018"),
-            ("Bulk Density", "2018"),
+            ("Bulk Density", "average"),
             ("Mineralogy", "average"),
             ("Nutrients", "2018"),
             ("Acidity", "2018"),
@@ -281,7 +281,7 @@ TARGET_CONFIG = {
         "predictor_groups": [
             ("Texture", "average"),
             ("Texture", "change"),
-            ("Bulk Density", "2018"),
+            ("Bulk Density", "average"),
             ("Mineralogy", "average"),
             ("Nutrients", "average"),
             ("Nutrients", "change"),
@@ -303,7 +303,7 @@ TARGET_CONFIG = {
         "target_name": "OC_avg_09_15_18",
         "predictor_groups": [
             ("Texture", "average"),
-            ("Bulk Density", "2018"),
+            ("Bulk Density", "average"),
             ("Mineralogy", "average"),
             ("Nutrients", "average"),
             ("Acidity", "average"),
@@ -317,8 +317,8 @@ TARGET_CONFIG = {
 }
 
 use_model = {
-    'MAOCi': 'XGB-n',
-    'MICi': 'XGB-n',
+    'MAOC': 'XGB-n',
+    'MIC': 'XGB-n',
     'dSOC': 'XGB-n',
     'SOC': 'XGB-n',
     # 'SOC09': 'XGB',

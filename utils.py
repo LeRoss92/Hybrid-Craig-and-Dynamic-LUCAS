@@ -119,55 +119,28 @@ def normalize_targets(y, target_mean, target_std):
     return (y - target_mean) / target_std
 
 def pools_to_loss_targets(y_cmp, y0, use_dynamic, targets_arg):
-    """
-    Converts model predictions of compartment pools into loss targets appropriate for different training tasks.
-
-    Args:
-        y_cmp (jnp.ndarray): Model output pools representing either the change in pool sizes (if use_dynamic=True) 
-            or the absolute pool sizes (if use_dynamic=False). Shape (..., 3).
-        y0 (jnp.ndarray): Initial pool values (required if use_dynamic=True), same shape as y_cmp.
-        use_dynamic (bool): 
-            - If True, y_cmp contains the *change* in pool sizes since y0, and final total pools are y_cmp + y0.
-            - If False, y_cmp contains the *absolute* pool sizes, and y0 is ignored.
-        targets_arg (str): Specifies which target variables to compute. Options are:
-            - "SOC": total SOC only.
-            - "SOC,MICi": total SOC and (dynamic: ΔCb | steady: microbial fraction).
-            - "SOC,MAOCi": total SOC and (dynamic: ΔCm | steady: MAOC fraction).
-            - "SOC,MAOCi,MICi": total SOC and both MAOC and MIC (dynamic: ΔCm, ΔCb | steady: fractions).
-
-    Returns:
-        jnp.ndarray: Target array for loss computation, concatenated as needed for the output type.
-            - Shape (..., n_targets), where n_targets depends on targets_arg.
-
-    Raises:
-        KeyError: If targets_arg is not a recognized target specification.
-
-    Notes:
-        - The order of pools in y_cmp and y0 is assumed to be: [Cp, Cb, Cm] (particulate, microbial, MAOC).
-        - Steady-state: MICi/MAOCi are fractions of final pools. Dynamic: MICi/MAOCi are ΔCb / ΔCm.
-    """
     soc_sum = jnp.sum(y_cmp, axis=-1, keepdims=True)
     if targets_arg == "SOC":
         return soc_sum
     if use_dynamic:
         mic_delta = y_cmp[:, 1:2]
         maoc_delta = y_cmp[:, 2:3]
-        if targets_arg == "SOC,MICi":
+        if targets_arg == "SOC,MIC":
             return jnp.concatenate([soc_sum, mic_delta], axis=-1)
-        if targets_arg == "SOC,MAOCi":
+        if targets_arg == "SOC,MAOC":
             return jnp.concatenate([soc_sum, maoc_delta], axis=-1)
-        if targets_arg == "SOC,MAOCi,MICi":
+        if targets_arg == "SOC,MAOC,MIC":
             return jnp.concatenate([soc_sum, maoc_delta, mic_delta], axis=-1)
         raise KeyError(targets_arg)
     y_fin = y_cmp
     soc_lvl = jnp.sum(y_fin, axis=-1, keepdims=True) + 1e-12
     mic_r = y_fin[:, 1:2] / soc_lvl
     maoc_r = y_fin[:, 2:3] / soc_lvl
-    if targets_arg == "SOC,MICi":
+    if targets_arg == "SOC,MIC":
         return jnp.concatenate([soc_sum, mic_r], axis=-1)
-    if targets_arg == "SOC,MAOCi":
+    if targets_arg == "SOC,MAOC":
         return jnp.concatenate([soc_sum, maoc_r], axis=-1)
-    if targets_arg == "SOC,MAOCi,MICi":
+    if targets_arg == "SOC,MAOC,MIC":
         return jnp.concatenate([soc_sum, maoc_r, mic_r], axis=-1)
     raise KeyError(targets_arg)
 
