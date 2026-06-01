@@ -4,11 +4,11 @@ source ~/.bashrc
 micromamba activate DPL_JAX_copy
 
 temps=('static') #  'dynamic'
-microbial_decompositions=('linear') #  'MM' 'RMM'
-microbial_turnovers=('linear') #  'density_dependent'
-saturations=('no') #  'Langmuir'
-targets_combinations=('SOC') #  'SOC,MICi' 'SOC,MAOCi' 'SOC,MAOCi,MICi'
-folds=(0) #  0 1 2 3 4 5 6 7 8 9
+microbial_decompositions=('linear' 'MM' 'RMM')
+microbial_turnovers=('linear' 'density_dependent')
+saturations=('no'  'Langmuir')
+targets_combinations=('SOC' 'SOC,MIC' 'SOC,MAOC' 'SOC,MAOC,MIC')
+folds=(0 1 2 3 4 5 6 7 8 9)
 
 mkdir -p hybrid_outputs
 

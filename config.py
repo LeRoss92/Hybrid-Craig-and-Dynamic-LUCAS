@@ -183,6 +183,7 @@ pred_groups = {
             'P': 'era5_land_tp_2009-5_mean',
             'PET': 'era5_land_hpet_2009-5_mean',
             'AI': 'aridity_index_2009-5_mean',
+            'WAI': 'WAI1_2009-5_mean',
         },
         '2015': {
             'H': 'Fluxcom_H_2015-5_mean',
@@ -191,6 +192,7 @@ pred_groups = {
             'P': 'era5_land_tp_2015-5_mean',
             'PET': 'era5_land_hpet_2015-5_mean',
             'AI': 'aridity_index_2015-5_mean',
+            'WAI': 'WAI1_2015-5_mean',
         },
         '2018': {
             'H': 'Fluxcom_H_2018-5_mean',
@@ -199,6 +201,7 @@ pred_groups = {
             'P': 'era5_land_tp_2018-5_mean',
             'PET': 'era5_land_hpet_2018-5_mean',
             'AI': 'aridity_index_2018-5_mean',
+            'WAI': 'WAI1_2018-5_mean',
         },
         'average': {
             'H': 'Fluxcom_H_avg_09_15_18',
@@ -207,6 +210,7 @@ pred_groups = {
             'P': 'era5_land_tp_avg_09_15_18',
             'PET': 'era5_land_hpet_avg_09_15_18',
             'AI': 'aridity_index_avg_09_15_18',
+            'WAI': 'WAI1_avg_09_15_18',
         },
         'change': {
             'H': 'Fluxcom_H_linreg_slope',
@@ -215,6 +219,7 @@ pred_groups = {
             'P': 'era5_land_tp_linreg_slope',
             'PET': 'era5_land_hpet_linreg_slope',
             'AI': 'aridity_index_linreg_slope',
+            'WAI': 'WAI1_linreg_slope',
         },
     },
     'NPP': {
@@ -464,6 +469,37 @@ default_param_ranges = {
         "unit": "yr^-1",
         "description": "First‑order decay rate for mineral‑associated SOC"
     }
+}
+
+default_Q10_ranges = {
+    "Vmax_p": {
+        "min": 1.0,
+        "default": 1.4,
+        "max": 3.0,
+        "unit": "-", 
+        "description": "-"
+    },
+    "Vmax_m": {
+        "min": 1.0,
+        "default": 1.4,
+        "max": 3.0,
+        "unit": "-", 
+        "description": "-"
+    },
+    "Km_p": {
+        "min": 1.0,
+        "default": 1.4,
+        "max": 3.0,
+        "unit": "-", 
+        "description": "-"
+    },
+    "Km_m": {
+        "min": 1.0,
+        "default": 1.4,
+        "max": 3.0,
+        "unit": "-", 
+        "description": "-"
+    },
 }
 
 default_state_bounds = {

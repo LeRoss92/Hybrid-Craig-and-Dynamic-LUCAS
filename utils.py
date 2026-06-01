@@ -106,13 +106,27 @@ def build_param_matrix(
     *,
     param_mins,
     param_maxs,
-    global_mask,):
+    global_mask,
+    q10_raw=None,
+    temp_batch=None,):
     raw_local = jax.vmap(lambda x: mlp_forward(net_params, x))(x_batch)
     local_params = constrain_to_range(raw_local, param_mins, param_maxs)
     if global_raw is not None:
         global_params = constrain_to_range(global_raw, param_mins, param_maxs)
         local_params = jnp.where(global_mask, global_params, local_params)
     local_params = local_params.at[:, 0].set(npp_I_batch)
+    if q10_raw is not None:
+        from config import default_param_ranges, default_Q10_ranges
+        q10_names = list(default_Q10_ranges.keys())
+        param_names = list(default_param_ranges.keys())
+        q10_mins = jnp.array([default_Q10_ranges[n]["min"] for n in q10_names])
+        q10_maxs = jnp.array([default_Q10_ranges[n]["max"] for n in q10_names])
+        q10_idx = jnp.array([param_names.index(n) for n in q10_names])
+        q10_vals = constrain_to_range(q10_raw, q10_mins, q10_maxs)
+        delta = (temp_batch - 273.15 - 10.0) / 10.0
+        for i in range(q10_idx.shape[0]):
+            idx = q10_idx[i]
+            local_params = local_params.at[:, idx].set(local_params[:, idx] * (q10_vals[i] ** delta))
     return local_params
 
 def normalize_targets(y, target_mean, target_std):
@@ -144,8 +158,8 @@ def pools_to_loss_targets(y_cmp, y0, use_dynamic, targets_arg):
         return jnp.concatenate([soc_sum, maoc_r, mic_r], axis=-1)
     raise KeyError(targets_arg)
 
-def eval_components(params, x_batch, npp_I_batch, y0_batch, y_target, *, param_mins, param_maxs, global_mask, use_dynamic, batched_sim, batched_steady, target_mean, target_std, targets_arg):
-    p_pred = build_param_matrix(params["net"], params["global"], x_batch, npp_I_batch, param_mins=param_mins, param_maxs=param_maxs, global_mask=global_mask)
+def eval_components(params, x_batch, npp_I_batch, y0_batch, y_target, *, param_mins, param_maxs, global_mask, use_dynamic, batched_sim, batched_steady, target_mean, target_std, targets_arg, temp_batch=None):
+    p_pred = build_param_matrix(params["net"], params["global"], x_batch, npp_I_batch, param_mins=param_mins, param_maxs=param_maxs, global_mask=global_mask, q10_raw=params.get("q10"), temp_batch=temp_batch)
     if use_dynamic:
         y_pred = batched_sim(p_pred, y0_batch)
         y_pred_compare = y_pred - y0_batch
@@ -177,6 +191,7 @@ def eval_loss(
     target_mean,
     target_std,
     targets_arg,
+    temp_batch=None,
     ):
     per_component = eval_components(
         params,
@@ -193,6 +208,7 @@ def eval_loss(
         target_mean=target_mean,
         target_std=target_std,
         targets_arg=targets_arg,
+        temp_batch=temp_batch,
     )
     weights = weights / (jnp.sum(weights) + 1e-8)
     loss = jnp.sum(per_component * weights)
@@ -226,7 +242,8 @@ def eval_r2(
     use_dynamic,
     batched_sim,
     batched_steady,
-    targets_arg,):
+    targets_arg,
+    temp_batch=None,):
 
     p_pred = build_param_matrix(
         params["net"],
@@ -236,6 +253,8 @@ def eval_r2(
         param_mins=param_mins,
         param_maxs=param_maxs,
         global_mask=global_mask,
+        q10_raw=params.get("q10"),
+        temp_batch=temp_batch,
     )
     if use_dynamic:
         y_pred = batched_sim(p_pred, y0_batch)
@@ -267,7 +286,8 @@ def train_step(
     batched_steady,
     target_mean,
     target_std,
-    targets_arg,):
+    targets_arg,
+    temp_batch=None,):
     (loss, per_component), grads = jax.value_and_grad(eval_loss, has_aux=True)(
         params,
         x_batch,
@@ -284,6 +304,7 @@ def train_step(
         target_mean=target_mean,
         target_std=target_std,
         targets_arg=targets_arg,
+        temp_batch=temp_batch,
     )
     weight_decay = 1e-4
     loss = loss + weight_decay * l2_norm(params)
