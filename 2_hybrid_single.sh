@@ -14,6 +14,6 @@ combo="$1"
 echo "Combo: $combo"
 IFS=':' read -r temp fold md mt sat targets <<< "$combo"
 
-cmd=(python 2_hybrid_Tsense.py --temp "$temp" --fold "$fold" --md "$md" --mt "$mt" --sat "$sat" --targets "$targets")
+cmd=(python 2_hybrid.py --temp "$temp" --fold "$fold" --md "$md" --mt "$mt" --sat "$sat" --targets "$targets")
 "${cmd[@]}"
 

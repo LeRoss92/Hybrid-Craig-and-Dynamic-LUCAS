@@ -50,6 +50,8 @@ TARGET_LABELS = {
     "SOC,MAOC,MIC": ["SOC", "MAOC", "MIC"],
 }
 
+MIN_STATIC_TARGET_ROWS = 1000
+
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--temp"); parser.add_argument("--fold"); parser.add_argument("--md"); parser.add_argument("--mt"); parser.add_argument("--sat"); parser.add_argument("--targets"); args = parser.parse_args()
     start_time = time.perf_counter()
@@ -118,22 +120,41 @@ def main():
         predictors = list(dict.fromkeys(predictors)) # Remove redundant predictors
         helper_df = df.copy()
         input_col = "input_avg_09_15_18"
-        subfraction_cols = ["MICi", "MAOCi"] if not use_dynamic else ["MIC", "MAOC"]
-        required_cols = ["SOC", "POC", "MIC", "MAOC"] + subfraction_cols + predictors + [input_col, 'era5_land_t2m_avg_09_15_18', 'split']
+        ta = args.targets
+        target_labels = TARGET_LABELS[ta]
+        target_columns = {"SOC": "SOC"}
+        if use_dynamic:
+            target_columns.update({"MIC": "MIC", "MAOC": "MAOC"})
+        else:
+            for label in ("MIC", "MAOC"):
+                if label in target_labels:
+                    col = f"{label}i"
+                    if col not in helper_df.columns:
+                        raise ValueError(
+                            f"Missing static target column {col}. Rerun preprocessing so {col} is "
+                            f"filled from the median predicted {label} index."
+                        )
+                    target_columns[label] = col
+        target_source_cols = [target_columns[label] for label in target_labels]
+        required_cols = ["SOC", "POC", "MIC", "MAOC"] + target_source_cols + predictors + [input_col, 'era5_land_t2m_avg_09_15_18', 'split']
         helper_df = helper_df[list(dict.fromkeys(required_cols))]
 
         npp_mask = (helper_df[input_col].notna() & np.isfinite(helper_df[input_col]) & (helper_df[input_col] > 0)).to_numpy()
         original_idx = np.where(npp_mask)[0]
         helper_df = helper_df.loc[npp_mask].reset_index(drop=True)
         split_col = helper_df["split"].astype(str).to_numpy() # use same splits as in prediction
+        if not use_dynamic:
+            min_rows = max(MIN_STATIC_TARGET_ROWS, int(0.5 * len(helper_df)))
+            for label in ("MIC", "MAOC"):
+                if label in target_labels:
+                    col = target_columns[label]
+                    n_finite = int(np.isfinite(helper_df[col].to_numpy()).sum())
+                    if n_finite < min_rows:
+                        raise ValueError(
+                            f"Static target column {col} is not dense enough ({n_finite}/{len(helper_df)} finite). "
+                            f"Rerun preprocessing so {col} is filled from the median predicted {label} index."
+                        )
 
-        ta = args.targets
-        target_columns = {"SOC": "SOC"}
-        if use_dynamic:
-            target_columns.update({"MIC": "MIC", "MAOC": "MAOC"})
-        else:
-            target_columns.update({"MIC": "MICi", "MAOC": "MAOCi"})
-        target_labels = TARGET_LABELS[ta]
         target_values = np.column_stack([helper_df[target_columns[label]].to_numpy() for label in target_labels])
         label_mask = np.all(np.isfinite(target_values), axis=1)
         train_idx = np.where(label_mask & (split_col != "test") & (split_col != str(args.fold)))[0] # train on all folds except validation fold (and also not test)
