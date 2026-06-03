@@ -262,7 +262,7 @@ TARGET_CONFIG = {
             ("Atmosphere", "2009"),
             ("NPP", "2009"),
             ],
-        "selected_predictors": ["CN_2009", "lc1_2_2009_B", "OC_2009", "ClaySilt", "era5_land_hpet_2009-5_mean", "Ox_Al_2018"]
+        "selected_predictors": ["CN_2009", "ClaySilt", "aridity_index_2009-5_mean", "OC_2009"]
     },
     "MIC": {
         "target_name": "Cmic_index_2018",
@@ -279,7 +279,7 @@ TARGET_CONFIG = {
             ("Atmosphere", "2018"),
             ("NPP", "2018"),
             ],
-        "selected_predictors": ["CN_2018", "pH_CaCl2_2018", "era5_land_hpet_2018-5_mean", "ClaySilt", "OC_2018"]
+        "selected_predictors": ["pH_H2O_2018", "OC_2018", "CN_2018", "ClaySilt"]
     },
     "dSOC": {
         "target_name": "OC_linreg_slope",
@@ -302,7 +302,7 @@ TARGET_CONFIG = {
             ("NPP", "average"),
             ("NPP", "change"),
             ],
-        "selected_predictors": ["CN_linreg_slope", "Clay", "ClaySilt", "CP_linreg_slope", "OC_avg_09_15_18", "pH_H2O_avg_09_15_18", "pH_CaCl2_avg_09_15_18", "era5_land_hpet_avg_09_15_18"]
+        "selected_predictors": ["CN_linreg_slope", "Clay", "OC_avg_09_15_18", "ClaySilt", 'WAI1_avg_09_15_18', "pH_H2O_linreg_slope", "pH_H2O_avg_09_15_18"]
     },
     "SOC": {
         "target_name": "OC_avg_09_15_18",
@@ -317,7 +317,7 @@ TARGET_CONFIG = {
             ("Atmosphere", "average"),
             ("NPP", "average"),
             ],
-        "selected_predictors": ["CP_avg_09_15_18", "CN_avg_09_15_18", "aridity_index_avg_09_15_18", "Clay", "ClaySilt", "pH_H2O_avg_09_15_18", "E_avg_09_15_18"]
+        "selected_predictors": ["CP_avg_09_15_18", "CN_avg_09_15_18", "aridity_index_avg_09_15_18", "ClaySilt", "pH_H2O_avg_09_15_18", "MODIS_NPP_avg_09_15_18", "CK_avg_09_15_18", "Clay"]
     }
 }
 
@@ -339,36 +339,6 @@ TRAIN_DEFAULTS = {
     'n_jobs_folds': 8,
     'N_JOBS': 70
 }
-
-# # Legacy exports for 6_hybrid, 7_analysis, sensitivity_analysis
-# predictors_dynamic = (
-#     pred_groups['Texture']
-#     + pred_groups['Mineral Activity'][2015]
-#     + pred_groups['Ox. ex. Al/Fe']
-#     + pred_groups['LUCAS normal avg']
-#     + pred_groups['Fluxcom_era5l change']
-#     + pred_groups['Fluxcom_era5l avg']
-#     # + pred_groups['WorldClim'][2015]
-#     # + pred_groups['AlphaEarth 2017+2018'][2015]
-#     + pred_groups['doy change']
-#     + pred_groups['doy avg']
-#     + pred_groups['OC (log) avg'] + pred_groups['LUCAS log avg']
-# )
-# # Same time-aggregated predictors for hybrid steady-state (replaces single-year 2015/2018 columns).
-# predictors_static = (
-#     pred_groups['Texture']
-#     + pred_groups['Mineral Activity'][2015]
-#     + pred_groups['Ox. ex. Al/Fe']
-#     # + pred_groups['LUCAS normal avg']
-#     + pred_groups['Fluxcom_era5l change']
-#     + pred_groups['Fluxcom_era5l avg']
-#     # + pred_groups['WorldClim'][2015]
-#     # + pred_groups['AlphaEarth 2017+2018'][2015]
-#     + pred_groups['doy change']
-#     + pred_groups['doy avg']
-#     # + pred_groups['OC (log) avg'] + pred_groups['LUCAS log avg']
-# )
-# log_cols = pred_groups['LUCAS log'][2015] + pred_groups['LUCAS log'][2018]+ pred_groups['OC (log) avg'] + pred_groups['LUCAS log avg']
 
 default_param_ranges = {
     "I": {
