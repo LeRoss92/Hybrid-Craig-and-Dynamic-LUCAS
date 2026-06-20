@@ -11,7 +11,7 @@ import numpy as np
 from models import craig_BA_adapt, analytical_steady_state
 from config import default_param_ranges, default_Q10_ranges, TARGET_CONFIG
 import utils
-from utils import vector_field, simulate_final_state, init_mlp, build_param_matrix, eval_loss, init_adam, eval_r2, train_step, constrain_to_range
+from utils import vector_field, simulate_final_state, init_mlp, build_param_matrix, eval_loss, init_adam, eval_r2, train_step, constrain_to_range, build_hybrid_predictors
 
 
 def pools_to_loss_targets(y_cmp, y0, use_dynamic, targets_arg):
@@ -106,23 +106,7 @@ def main():
         # preprocess: get data, log some features & calculate stocks, get split indices, impute, create targets, normalize
         df = pd.read_pickle("1_preprocessed.pkl") # get data
         targets = args.targets.split(',') # target(s)
-        predictors = []
-        for tar in targets:
-            for pred in TARGET_CONFIG[tar]['selected_predictors']:
-                if any(year in pred for year in ['2009', '2015', '2018']):
-                    if (pred.endswith('2009') or pred.endswith('2015') or pred.endswith('2018')) and pred != 'Ox_Al_2018':
-                        predictors.append(pred.replace('_2009', '_avg_09_15_18').replace('_2015', '_avg_09_15_18').replace('_2018', '_avg_09_15_18'))
-                    elif pred == 'Ox_Al_2018':
-                        predictors.append(pred)
-                    elif pred.startswith('lc1_2_'):
-                        predictors.append(pred[-1]+'_avg_09_15_18')
-                    elif '-5_mean' in pred:
-                        predictors.append(pred[:-12]+'_avg_09_15_18')
-                    else:
-                        raise ValueError(f'Not yet know what to do with: {pred}')                   
-                else:
-                    predictors.append(pred)
-        predictors = list(dict.fromkeys(predictors)) # Remove redundant predictors
+        predictors = build_hybrid_predictors(targets)
         helper_df = df.copy()
         input_col = "input_avg_09_15_18"
         ta = args.targets

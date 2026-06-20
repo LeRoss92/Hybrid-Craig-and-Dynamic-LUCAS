@@ -2,6 +2,7 @@ import numpy as np
 import warnings
 import pandas as pd
 import os
+import json
 import matplotlib
 import matplotlib.pyplot as plt
 import jax
@@ -23,6 +24,76 @@ from sklearn.utils.parallel import Parallel, delayed
 from functools import partial
 
 from models import get_models
+
+
+# --------------------------------------------------------------------------- #
+# Selected predictors loaded from selected_predictors.json
+# The JSON stores short labels (e.g. "N 2009"); map them back to the raw
+# dataframe column names (e.g. "N_2009") expected by the modelling scripts.
+# --------------------------------------------------------------------------- #
+_LABEL_TO_COL_CACHE = None
+
+
+def _label_to_col():
+    """Inverse of the notebook's short_label(): 'key subgroup' -> raw column name."""
+    global _LABEL_TO_COL_CACHE
+    if _LABEL_TO_COL_CACHE is None:
+        from config import pred_groups
+        m = {}
+        for group_dict in pred_groups.values():
+            for subgroup, members in group_dict.items():
+                if isinstance(members, dict):
+                    for key, val in members.items():
+                        m[f"{key} {subgroup}"] = val
+        _LABEL_TO_COL_CACHE = m
+    return _LABEL_TO_COL_CACHE
+
+
+def get_selected_predictors(target, json_path=None):
+    """Return the selected predictors for `target` from selected_predictors.json,
+    mapped from short labels back to raw dataframe column names."""
+    if json_path is None:
+        json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "selected_predictors.json")
+    with open(json_path) as f:
+        selected = json.load(f)
+    label_to_col = _label_to_col()
+    labels = selected[target]
+    missing = [lbl for lbl in labels if lbl not in label_to_col]
+    if missing:
+        raise KeyError(f"{target}: labels not found in pred_groups -> {missing}")
+    return [label_to_col[lbl] for lbl in labels]
+
+
+def normalize_hybrid_predictor(pred: str) -> str:
+    """Map a raw predictor column to the column name used by hybrid scripts."""
+    if pred in ("Ox_Al_2018", "BD 0-20_2018"):
+        return pred
+    if "_avg_09_15_18" in pred or "_linreg_slope" in pred or "_2015gps_" in pred:
+        return pred
+    if pred.startswith("lc1_2_"):
+        return pred[-1] + "_avg_09_15_18"
+    if "-5_mean" in pred:
+        return pred[:-12] + "_avg_09_15_18"
+    if pred.endswith(("_2009", "_2015", "_2018")):
+        return (pred.replace("_2009", "_avg_09_15_18")
+                    .replace("_2015", "_avg_09_15_18")
+                    .replace("_2018", "_avg_09_15_18"))
+    return pred
+
+
+def build_hybrid_predictors(targets):
+    """Collect unique hybrid predictors for one or more targets."""
+    if isinstance(targets, str):
+        target_list = [t.strip() for t in targets.split(",") if t.strip()]
+    else:
+        target_list = list(targets)
+    predictors = []
+    for tar in target_list:
+        for pred in get_selected_predictors(tar):
+            predictors.append(normalize_hybrid_predictor(pred))
+    return list(dict.fromkeys(predictors))
+
 
 def haversine(lat1, lon1, lat2, lon2):
     """in meters"""

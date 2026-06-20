@@ -8,10 +8,10 @@ Idea
 ----
 The static experiments (``2_hybrid.py`` with ``--temp static``) already fit every
 mechanistic parameter spatially to reproduce the steady-state SOC / MAOC / MIC.
-Here we *freeze* all of those per-site static parameters and re-learn **one**
-parameter at a time (or one pair at a time) spatially, so that the dynamic model
-reproduces the observed 9-year SOC change.  This isolates which parameter(s) most
-need to "move" to explain the temporal change on top of the static fit.
+Here we *freeze* all of those per-site static parameters and progressively
+re-learn spatial parameters in order of dynamic sensitivity (most sensitive
+first, then cumulatively adding the next), mirroring the spatial/global sweep
+in ``2_hybrid.py``.
 
 Initial conditions  (from the end of 1_preprocess.ipynb)
     SOC_minus_4.5y is split into the three pools using the predicted indices
@@ -29,21 +29,19 @@ Fixed parameters
     (I is always overwritten by the carbon input NPP, exactly as in 2_hybrid.py).
 
 Predictors
-    All selected_predictors for dSOC from config.py (TARGET_CONFIG["dSOC"]):
-        CN_linreg_slope, Clay, OC_avg_09_15_18, ClaySilt,
-        WAI1_avg_09_15_18, pH_H2O_linreg_slope, pH_H2O_avg_09_15_18
+    All selected_predictors for dSOC from selected_predictors.json — the same
+    covariates used to build pred_dSOC_median_XGB-n and hence SOC_plus/minus_4.5y.
 
 Parameter sets
-    Every single non-zero-sensitivity parameter is re-learned on its own, and
-    additionally every pair of them is re-learned together (the NN then outputs
-    two values, one per parameter).  This shows whether letting two parameters
-    co-vary spatially explains more of the SOC change than either alone.
+    Non-zero dynamic sensitivities (excluding I), sorted by |sensitivity|
+    descending.  We re-learn them cumulatively: the most sensitive parameter
+    alone, then + the second, then + the third, … up to all spatial parameters.
 
 Outputs
 -------
 figures/dynamic_hybrid/{md}_{mt}_{sat}/
-    r2_per_parameter.png                       bar chart of val R²(ΔSOC) for every
-                                               single parameter AND every pair
+    r2_per_parameter.png                       bar chart of val R²(ΔSOC) for each
+                                               cumulative sensitivity step
     {label}_learned_{param}_beeswarm.png       SHAP: learned param ~ covariates
     {label}_learned_{param}_effect.png
     {label}_learned_{param}_interactions.png
@@ -61,7 +59,6 @@ Run with:
 import os
 import time
 from functools import partial
-from itertools import combinations
 from pathlib import Path
 
 import matplotlib
@@ -76,8 +73,9 @@ import jax
 import jax.numpy as jnp
 
 from models import craig_BA_adapt
-from config import default_param_ranges, TARGET_CONFIG
+from config import default_param_ranges
 from utils import (
+    get_selected_predictors,
     init_mlp,
     mlp_forward,
     init_adam,
@@ -121,40 +119,20 @@ PARAM_COLS = [f"param_{n}" for n in PARAM_NAMES]
 
 OUT_FIG = Path("figures/dynamic_hybrid")
 OUT_DATA = Path("hybrid_outputs_dynamic")
+SKIP_SHAP = os.environ.get("HYBRID_SKIP_SHAP", "0").lower() in ("1", "true", "yes")
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# Predictors: dSOC selected_predictors from config.py, minus those already
-# used in the static SOC / MAOC / MIC experiments.  This leaves only the
-# change-specific covariates that carry signal beyond the frozen static fit:
-#   CN_linreg_slope, WAI1_avg_09_15_18, pH_H2O_linreg_slope
+# Predictors: every dSOC selected predictor (same set as the XGB dSOC target).
 # ───────────────────────────────────────────────────────────────────────────
-def _normalize_pred(pred: str) -> str:
-    if pred == "Ox_Al_2018":
-        return pred
-    if pred.startswith("lc1_2_"):
-        return pred[-1] + "_avg_09_15_18"
-    if "-5_mean" in pred:
-        return pred[:-12] + "_avg_09_15_18"
-    if pred.endswith(("_2009", "_2015", "_2018")):
-        return (pred.replace("_2009", "_avg_09_15_18")
-                    .replace("_2015", "_avg_09_15_18")
-                    .replace("_2018", "_avg_09_15_18"))
-    return pred
-
-
 def _build_dynamic_predictors() -> list[str]:
-    static_used = set()
-    for tgt in ("SOC", "MAOC", "MIC"):
-        for p in TARGET_CONFIG[tgt]["selected_predictors"]:
-            static_used.add(_normalize_pred(p))
-    return list(dict.fromkeys(
-        p for p in TARGET_CONFIG["dSOC"]["selected_predictors"]
-        if _normalize_pred(p) not in static_used
-    ))
+    return list(dict.fromkeys(get_selected_predictors("dSOC")))
 
 
 DYNAMIC_PREDICTORS = _build_dynamic_predictors()
+
+# Re-learned parameters move around the per-site static fit, not from mid-range.
+RESIDUAL_SPAN_FRAC = 0.5
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -279,13 +257,20 @@ def r2_score(pred: np.ndarray, target: np.ndarray) -> float:
     return 1.0 - ss_res / (ss_tot + 1e-12)
 
 
+def learned_params(raw, static_b, param_idxs, p_mins, p_maxs):
+    """Perturb frozen static parameters, starting at the static fit (raw=0)."""
+    p_base = static_b[:, param_idxs]
+    span = p_maxs - p_mins
+    p_dyn = p_base + span * RESIDUAL_SPAN_FRAC * jnp.tanh(raw)
+    return jnp.clip(p_dyn, p_mins, p_maxs)
+
+
 def make_train_fns(batched_sim, param_idxs, p_mins, p_maxs):
     """Build a single fused jitted train-step plus eval/predict closures.
 
     ``param_idxs`` / ``p_mins`` / ``p_maxs`` are arrays (length k = number of
-    parameters re-learned together).  The NN outputs k values, each squashed
-    into its own [min, max] range and written into the corresponding column of
-    the otherwise-frozen static parameter matrix.
+    parameters re-learned together).  The NN outputs k residual adjustments
+    around the per-site static parameters (zero at initialisation).
 
     Mirrors the structure of ``utils.train_step`` in 2_hybrid.py: the loss, its
     gradient, gradient clipping and the Adam update are all compiled into one
@@ -297,7 +282,7 @@ def make_train_fns(batched_sim, param_idxs, p_mins, p_maxs):
 
     def predict_delta(net_p, x_b, static_b, npp_b, y0_b):
         raw = jax.vmap(lambda xi: mlp_forward(net_p, xi))(x_b)   # (n, k)
-        p_dyn = p_mins + (p_maxs - p_mins) * jax.nn.sigmoid(raw)
+        p_dyn = learned_params(raw, static_b, param_idxs, p_mins, p_maxs)
         # Freeze static params, overwrite the learned columns and I (=NPP).
         p_mat = static_b.at[:, param_idxs].set(p_dyn).at[:, 0].set(npp_b)
         pf = batched_sim(p_mat, y0_b)
@@ -412,12 +397,13 @@ def train_combo(data: dict, param_names: list[str], batched_sim) -> dict | None:
     targ_val = np.asarray(jax.device_get(delta_all[val_idx]))
     r2_delta = r2_score(pred_val, targ_val)
 
-    # Predicted yearly slope = ΔSOC / 9 (model window); compare to observed slope.
-    pred_slope = pred_val / (T1 - T0)
+    # Approximate log-OC slope (pred_dSOC units) from predicted ΔSOC and SOC at t0.
+    soc0_val = np.asarray(jax.device_get(jnp.sum(y0_all[val_idx], axis=-1)))
+    pred_log_slope = np.log1p(pred_val / np.clip(soc0_val, 1e-4, None)) / (T1 - T0)
     obs_slope_val = data["obs_slope"][val_idx]
     # r2_slope is secondary and only computed where the observed slope exists.
-    obs_mask = np.isfinite(obs_slope_val)
-    r2_slope = r2_score(pred_slope[obs_mask], obs_slope_val[obs_mask]) if obs_mask.sum() > 10 else float("nan")
+    obs_mask = np.isfinite(obs_slope_val) & np.isfinite(pred_log_slope)
+    r2_slope = r2_score(obs_slope_val[obs_mask], pred_log_slope[obs_mask]) if obs_mask.sum() > 10 else float("nan")
 
     print(f"    [{label}] val R²(ΔSOC)={r2_delta:+.3f}  "
           f"R²(slope)={r2_slope:+.3f}  time={time.perf_counter() - t0:.0f}s")
@@ -438,7 +424,7 @@ def train_combo(data: dict, param_names: list[str], batched_sim) -> dict | None:
         train_idx=train_idx,
         pred_delta_val=pred_val,
         tgt_delta_val=targ_val,
-        pred_slope_val=pred_slope,
+        pred_slope_val=pred_log_slope,
         obs_slope_val=obs_slope_val,
     )
 
@@ -446,46 +432,71 @@ def train_combo(data: dict, param_names: list[str], batched_sim) -> dict | None:
 # ───────────────────────────────────────────────────────────────────────────
 # R² bar chart
 # ───────────────────────────────────────────────────────────────────────────
-def plot_r2_bars(results: list, out_dir: Path, combo: str) -> None:
-    # Sort by the change-R² (descending) for readability.
-    results = sorted(results, key=lambda r: r["r2_delta"], reverse=True)
+def static_baseline_r2(data: dict, batched_sim, val_idx: np.ndarray) -> float:
+    """R²(ΔSOC) with every parameter frozen at the median static fit."""
+    static = jnp.asarray(data["static_params"])
+    static = static.at[:, 0].set(jnp.asarray(data["npp_I"]))
+    y0 = jnp.asarray(data["y0"])
+    pred = np.asarray(jax.device_get(batched_sim(static, y0)))
+    pred_delta = np.sum(pred - np.asarray(y0), axis=1)
+    targ = data["delta_target"][val_idx]
+    return r2_score(pred_delta[val_idx], targ)
+
+
+def plot_r2_bars(results: list, out_dir: Path, combo: str, *, static_r2: float) -> None:
+    # Results are in cumulative sensitivity order (1 param → all).
+    if results:
+        results[-1]["is_ceiling"] = True
+
     names = [r["label"] for r in results]
     r2_delta = [r["r2_delta"] for r in results]
-    is_pair = [r["n_learned"] >= 2 for r in results]
+    is_ceiling = [r.get("is_ceiling", False) for r in results]
+    is_multi = [r["n_learned"] > 1 and not r.get("is_ceiling", False) for r in results]
 
-    # Singles: blue/red by sign.  Pairs: darker tones, hatched, to distinguish.
     colors = []
-    for v, pair in zip(r2_delta, is_pair):
-        if pair:
+    for v, multi, ceiling in zip(r2_delta, is_multi, is_ceiling):
+        if ceiling:
+            colors.append("#2E7D32")
+        elif multi:
             colors.append("#1565C0" if v >= 0 else "#B71C1C")
         else:
             colors.append("#64B5F6" if v >= 0 else "#EF9A9A")
 
-    fig, ax = plt.subplots(figsize=(max(8, len(names) * 0.34), 5.5))
+    fig, ax = plt.subplots(figsize=(max(8, len(names) * 0.45), 5.5))
     bars = ax.bar(range(len(names)), r2_delta, color=colors,
                   edgecolor="white", linewidth=0.6)
-    for bar, pair in zip(bars, is_pair):
-        if pair:
+    for bar, multi, ceiling in zip(bars, is_multi, is_ceiling):
+        if ceiling:
+            bar.set_hatch("xx")
+            bar.set_edgecolor("#1B5E20")
+        elif multi:
             bar.set_hatch("//")
     ax.axhline(0, color="black", lw=0.9, ls="--")
+    ax.axhline(static_r2, color="#616161", lw=1.0, ls=":",
+               label=f"static only ({static_r2:+.2f})")
     ax.set_xticks(range(len(names)))
     ax.set_xticklabels(names, rotation=90, fontsize=7)
     ax.set_ylabel("Validation R² of the SOC change (Δ SOC over 9 yr)")
-    ax.set_xlabel("Re-learned mechanistic parameter(s) — all others frozen at static fit")
-    ax.set_title(f"Dynamic parameter learning v2 — R² of change per re-learned parameter set\n{combo}")
-    lo = min(min(r2_delta) - 0.05, -0.05)
-    hi = max(max(r2_delta) + 0.1, 0.1)
+    ax.set_xlabel("Cumulative re-learned parameters (most sensitive first; others frozen)")
+    ax.set_title(
+        f"Dynamic parameter learning v2 — R² of change per cumulative parameter step\n{combo}"
+    )
+    lo = max(min(r2_delta) - 0.05, -1.2)
+    hi = max(max(r2_delta) + 0.08, 0.15)
     ax.set_ylim(lo, hi)
-    for i, (v, pair) in enumerate(zip(r2_delta, is_pair)):
-        # Annotate only the positive bars to avoid clutter on the deep-negative ones.
-        if v >= -0.05:
-            ax.text(i, v + (0.01 if v >= 0 else -0.01), f"{v:.2f}",
-                    ha="center", va="bottom" if v >= 0 else "top", fontsize=6, rotation=90)
+    for i, (v, ceiling) in enumerate(zip(r2_delta, is_ceiling)):
+        if v >= lo + 0.02 or ceiling:
+            ax.text(i, min(v + 0.02, hi - 0.02), f"{v:.2f}",
+                    ha="center", va="bottom", fontsize=6, rotation=90)
     legend_handles = [
-        Patch(facecolor="#64B5F6", edgecolor="white", label="single parameter"),
-        Patch(facecolor="#1565C0", edgecolor="white", hatch="//", label="parameter pair"),
+        Patch(facecolor="#2E7D32", edgecolor="#1B5E20", hatch="xx",
+              label="all spatial params (final step)"),
+        Patch(facecolor="#64B5F6", edgecolor="white", label="1st step (most sensitive)"),
+        Patch(facecolor="#1565C0", edgecolor="white", hatch="//",
+              label="cumulative intermediate steps"),
+        plt.Line2D([0], [0], color="#616161", ls=":", label=f"static only ({static_r2:+.2f})"),
     ]
-    ax.legend(handles=legend_handles, loc="upper right", fontsize=8)
+    ax.legend(handles=legend_handles, loc="upper right", fontsize=7)
     fig.tight_layout()
     path = out_dir / "r2_per_parameter.png"
     fig.savefig(path, dpi=140, bbox_inches="tight")
@@ -591,12 +602,19 @@ def run_shap(result: dict, data: dict, batched_sim, out_dir: Path) -> None:
     X_expl = x_val_n[expl_idx]
     bg = shap.kmeans(x_val_n, min(N_BG, n))
 
+    # Median validation-site auxiliary inputs for KernelExplainer batches.
+    static_med = jnp.asarray(np.median(data["static_params"][val_idx], axis=0), dtype=jnp.float32)
+    npp_med = jnp.asarray(np.median(data["npp_I"][val_idx]), dtype=jnp.float32)
+    y0_med = jnp.asarray(np.median(data["y0"][val_idx], axis=0), dtype=jnp.float32)
+    n_param = static_med.shape[0]
+
     # ── View 1: learned parameter(s) ~ dynamic covariates (network only) ──────
     @jax.jit
     def _net_params(x_batch):
-        raw = jax.vmap(lambda xi: mlp_forward(net_p, xi))(
-            jnp.asarray(x_batch, dtype=jnp.float32))           # (n, k)
-        return p_mins + (p_maxs - p_mins) * jax.nn.sigmoid(raw)
+        xb = jnp.asarray(x_batch, dtype=jnp.float32)
+        raw = jax.vmap(lambda xi: mlp_forward(net_p, xi))(xb)           # (n, k)
+        static_b = jnp.broadcast_to(static_med, (xb.shape[0], static_med.shape[0]))
+        return learned_params(raw, static_b, pidxs, p_mins, p_maxs)
 
     def f_params(x):
         return np.asarray(jax.device_get(_net_params(x)))
@@ -620,18 +638,14 @@ def run_shap(result: dict, data: dict, batched_sim, out_dir: Path) -> None:
     # evaluated at a representative (median) validation site so the auxiliary
     # inputs (frozen static params, NPP, initial pools) are well defined for any
     # batch size the KernelExplainer feeds in. ─────────────────────────────────
-    static_med = jnp.asarray(np.median(data["static_params"][val_idx], axis=0), dtype=jnp.float32)
-    npp_med = jnp.asarray(np.median(data["npp_I"][val_idx]), dtype=jnp.float32)
-    y0_med = jnp.asarray(np.median(data["y0"][val_idx], axis=0), dtype=jnp.float32)
-    n_param = static_med.shape[0]
-
     @jax.jit
     def _dsoc(x_batch):
         xb = jnp.asarray(x_batch, dtype=jnp.float32)
         nb = xb.shape[0]
         raw = jax.vmap(lambda xi: mlp_forward(net_p, xi))(xb)        # (nb, k)
-        p_dyn = p_mins + (p_maxs - p_mins) * jax.nn.sigmoid(raw)
-        p_mat = (jnp.broadcast_to(static_med, (nb, n_param))
+        static_b = jnp.broadcast_to(static_med, (nb, n_param))
+        p_dyn = learned_params(raw, static_b, pidxs, p_mins, p_maxs)
+        p_mat = (static_b
                  .at[:, pidxs].set(p_dyn).at[:, 0].set(npp_med))
         y0b = jnp.broadcast_to(y0_med, (nb, 3))
         pf = batched_sim(p_mat, y0b)
@@ -659,6 +673,12 @@ def run_shap(result: dict, data: dict, batched_sim, out_dir: Path) -> None:
 # ───────────────────────────────────────────────────────────────────────────
 # Per-combo analysis
 # ───────────────────────────────────────────────────────────────────────────
+def _clear_label_plots(out_dir: Path, label: str) -> None:
+    """Remove stale SHAP / output PNGs for one parameter set before re-running it."""
+    for path in out_dir.glob(f"{label}_*.png"):
+        path.unlink()
+
+
 def analyse_combo(md: str, mt: str, sat: str) -> None:
     combo = f"{md}_{mt}_{sat}"
     out_dir = OUT_FIG / combo
@@ -689,26 +709,29 @@ def analyse_combo(md: str, mt: str, sat: str) -> None:
     param_sens = row.drop(labels=["md", "mt", "sat", "temp", "y0_Cp", "y0_Cb", "y0_Cm"])
     test_params = [n for n in PARAM_NAMES
                    if n != "I" and float(param_sens.get(n, 0.0)) != 0.0]
+    sorted_params = sorted(test_params,
+                           key=lambda name: abs(float(param_sens[name])),
+                           reverse=True)
+    param_sets = [sorted_params[:k] for k in range(1, len(sorted_params) + 1)]
+    print(f"  Dynamic sensitivities (desc): "
+          f"{', '.join(f'{n}={float(param_sens[n]):.3g}' for n in sorted_params)}")
+    print(f"  Cumulative steps: {len(param_sets)} "
+          f"(+{sorted_params[0]} → … → all)")
 
-    # All single parameters + every pair (combination of two).
-    param_sets = [[p] for p in test_params] + [list(c) for c in combinations(test_params, 2)]
-    print(f"  Parameters to re-learn: {test_params}")
-    print(f"  Parameter sets to fit: {len(test_params)} singles + "
-          f"{len(param_sets) - len(test_params)} pairs = {len(param_sets)} runs")
-
-    # Start from a clean figure directory so single/pair plots use one scheme.
-    for old in out_dir.glob("*.png"):
-        old.unlink()
+    val_idx = np.where(data["split_col"] == FOLD_VAL)[0]
+    static_r2 = static_baseline_r2(data, batched_sim, val_idx)
+    print(f"  Static-only baseline val R²(ΔSOC) = {static_r2:+.3f}")
 
     results = []
     OUT_DATA.mkdir(parents=True, exist_ok=True)
-    for pset in param_sets:
+    for step, pset in enumerate(param_sets, start=1):
         label = "+".join(pset)
-        kind = "single" if len(pset) == 1 else "pair"
-        print(f"\n  ── Re-learning {label} spatially ({kind}; others frozen) ──")
+        print(f"\n  ── Step {step}/{len(param_sets)}: re-learning {label} spatially ──")
+        _clear_label_plots(out_dir, label)
         res = train_combo(data, pset, batched_sim)
         if res is None:
             continue
+        res["step"] = step
         results.append(res)
 
         val_idx = res["val_idx"]
@@ -728,17 +751,23 @@ def analyse_combo(md: str, mt: str, sat: str) -> None:
         print(f"  No successful results for {combo}!")
         return
 
-    results.sort(key=lambda r: r["r2_delta"], reverse=True)
-    plot_r2_bars(results, out_dir, combo)
+    plot_r2_bars(results, out_dir, combo, static_r2=static_r2)
 
-    print(f"\n  Summary for {combo} (sorted by R²(ΔSOC)):")
-    print(f"  {'Parameter set':<22}  {'R²(ΔSOC)':>10}")
-    print(f"  {'-' * 34}")
+    print(f"\n  Summary for {combo} (cumulative sensitivity order):")
+    print(f"  {'Step':>4}  {'Parameter set':<30}  {'R²(ΔSOC)':>10}")
+    print(f"  {'-' * 48}")
     for res in results:
-        print(f"  {res['label']:<22}  {res['r2_delta']:>+10.4f}")
+        note = " (final)" if res["step"] == len(param_sets) else ""
+        print(f"  {res['step']:>4}  {res['label']:<30}  {res['r2_delta']:>+10.4f}{note}")
+    print(f"  {'':>4}  {'static only':<30}  {static_r2:>+10.4f}  (baseline)")
 
     print(f"\n  Running SHAP analysis (beeswarm + effect + interactions) ...")
-    for res in results:
+    if SKIP_SHAP:
+        print("  (skipped — set HYBRID_SKIP_SHAP=1 to disable)")
+    shap_targets = results[:]
+    for res in shap_targets:
+        if SKIP_SHAP:
+            break
         print(f"  ── SHAP for {res['label']} ──", flush=True)
         try:
             run_shap(res, data, batched_sim, out_dir)
@@ -753,7 +782,7 @@ def main() -> None:
     OUT_DATA.mkdir(parents=True, exist_ok=True)
 
     print("Dynamic hybrid parameter learning")
-    print(f"Predictors (all dSOC selected_predictors from config.py):")
+    print(f"Predictors (dSOC selected_predictors from selected_predictors.json):")
     print(f"  {DYNAMIC_PREDICTORS}")
 
     for md, mt, sat in MODELS:

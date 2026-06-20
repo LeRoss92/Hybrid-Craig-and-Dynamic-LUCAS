@@ -52,6 +52,7 @@ from models import craig_BA_adapt, analytical_steady_state
 from config import default_param_ranges, TARGET_CONFIG
 import utils
 from utils import (
+    build_hybrid_predictors,
     vector_field,
     simulate_final_state,
     init_mlp,
@@ -99,23 +100,7 @@ SHAP_ROOT = Path("figures/hybrid_shap")
 # --------------------------------------------------------------------------- #
 def build_predictors(targets):
     """Replicate the predictor construction from 2_hybrid.py."""
-    predictors = []
-    for tar in targets.split(","):
-        for pred in TARGET_CONFIG[tar]["selected_predictors"]:
-            if any(year in pred for year in ["2009", "2015", "2018"]):
-                if (pred.endswith("2009") or pred.endswith("2015") or pred.endswith("2018")) and pred != "Ox_Al_2018":
-                    predictors.append(pred.replace("_2009", "_avg_09_15_18").replace("_2015", "_avg_09_15_18").replace("_2018", "_avg_09_15_18"))
-                elif pred == "Ox_Al_2018":
-                    predictors.append(pred)
-                elif pred.startswith("lc1_2_"):
-                    predictors.append(pred[-1] + "_avg_09_15_18")
-                elif "-5_mean" in pred:
-                    predictors.append(pred[:-12] + "_avg_09_15_18")
-                else:
-                    raise ValueError(f"Not yet know what to do with: {pred}")
-            else:
-                predictors.append(pred)
-    return list(dict.fromkeys(predictors))
+    return build_hybrid_predictors(targets)
 
 
 def train_hybrid(md, mt, sat):

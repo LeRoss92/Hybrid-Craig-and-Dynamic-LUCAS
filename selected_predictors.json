@@ -1,0 +1,36 @@
+{
+  "MAOC": [
+    "pH CaCl2 2009",
+    "Clay average",
+    "Silt average",
+    "Wind Erosion average",
+    "N 2009",
+    "pH H2O 2009"
+  ],
+  "MIC": [
+    "pH H2O 2018",
+    "N 2018",
+    "WAI2 average",
+    "Consecutive Dry Days 2018"
+  ],
+  "dSOC": [
+    "T change",
+    "P average",
+    "AI change",
+    "WAI1 average",
+    "Bulk Density average",
+    "NPP average",
+    "LE average",
+    "PET average",
+    "Frost Days average",
+    "Clay average",
+    "H average",
+    "Water Table average"
+  ],
+  "SOC": [
+    "N average",
+    "Woodland average",
+    "pH CaCl2 average",
+    "T average"
+  ]
+}
