@@ -101,6 +101,8 @@ def main():
         # preprocess: get data, log some features & calculate stocks, get split indices, impute, create targets, normalize
         df = pd.read_pickle("1_preprocessed.pkl") # get data
         targets = args.targets.split(',') # target(s)
+        # Average versions of the selected index predictors (same normalize_hybrid_predictor
+        # mapping used in 1_preprocess to build the MICi/MAOCi targets) so inputs match the targets.
         predictors = build_hybrid_predictors(targets)
         helper_df = df.copy()
         input_col = "input_avg_09_15_18"
