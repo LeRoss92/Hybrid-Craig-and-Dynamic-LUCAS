@@ -185,7 +185,8 @@ def main():
         y0_train, y0_val = y0_true[train_idx], y0_true[val_idx]
 
         # initilize ML
-        net_params = init_mlp(jax.random.PRNGKey(0), [x_features.shape[1]] + [width] * depth + [param_mins.size]) # set up NN
+        init_key = jax.random.fold_in(jax.random.PRNGKey(0), int(args.fold))
+        net_params = init_mlp(init_key, [x_features.shape[1]] + [width] * depth + [param_mins.size]) # set up NN
         global_raw = jnp.zeros((param_mins.size,))
         params = {"net": net_params, "global": global_raw, "q10": q10_raw_init}
         n_targ = int(targets.shape[1])

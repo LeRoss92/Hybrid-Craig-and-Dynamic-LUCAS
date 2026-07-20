@@ -191,8 +191,8 @@ def get_models(seed=4210):
         },
         'XGB-n': {
             'model': XGBRegressor(
-                n_estimators=50,
-                learning_rate=0.1,
+                n_estimators=150,
+                learning_rate=0.05,
                 max_depth=6,
                 subsample=0.8,
                 colsample_bytree=0.8,
@@ -202,19 +202,15 @@ def get_models(seed=4210):
                 verbosity=0,
                 random_state=seed),
             'params': {
-                'n_estimators': [150],
-                'max_depth': [5],
-                'learning_rate': [0.05],
-                'subsample': [0.8],
-                'colsample_bytree': [0.8], # 0.5
-                'min_child_weight': [5], # , 5
+                'max_depth': [2, 5],
+                'min_child_weight': [5, 15],
                 'reg_alpha': [0.5],
                 },
         },
         'XGB-1': {
             'model': XGBRegressor(
-                n_estimators=50,
-                learning_rate=0.1,
+                n_estimators=150,
+                learning_rate=0.05,
                 max_depth=6,
                 subsample=0.8,
                 colsample_bytree=0.8,
@@ -224,13 +220,8 @@ def get_models(seed=4210):
                 verbosity=0,
                 random_state=seed),
             'params': {
-                'n_estimators': [150],
                 'max_depth': [1],
-                'learning_rate': [0.05],
-                'subsample': [0.8],
-                'colsample_bytree': [0.8], # 0.5
-                'min_child_weight': [5], # , 5
-                # 'reg_lambda': [1.0, 5.0, 10.0],
+                'min_child_weight': [5, 15],
                 'reg_alpha': [0.5],
                 },
         },
